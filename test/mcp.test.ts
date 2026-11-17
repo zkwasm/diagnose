@@ -19,7 +19,7 @@ test('real stdio MCP client pairs, starts, waits and disconnects', async () => {
   const client = new Client({ name: 'acceptance', version: '1.0.0' });
   const text = (result: any) => { assert.ok(!result.isError, JSON.stringify(result)); return JSON.parse(result.content[0].text); };
   try {
-    await client.connect(transport); assert.deepEqual((await client.listTools()).tools.map(tool => tool.name).sort(), ['diagnose_batch', 'diagnose_cancel', 'diagnose_disconnect', 'diagnose_forward', 'diagnose_pair', 'diagnose_process', 'diagnose_resource', 'diagnose_resume', 'diagnose_start', 'diagnose_transfer', 'diagnose_wait']);
+    await client.connect(transport); assert.deepEqual((await client.listTools()).tools.map(tool => tool.name).sort(), ['diagnose_batch', 'diagnose_cancel', 'diagnose_capabilities', 'diagnose_case', 'diagnose_disconnect', 'diagnose_forward', 'diagnose_pair', 'diagnose_process', 'diagnose_resource', 'diagnose_resume', 'diagnose_skill_draft', 'diagnose_skills', 'diagnose_start', 'diagnose_transfer', 'diagnose_wait']);
     assert.equal(text(await client.callTool({ name: 'diagnose_pair', arguments: { code, label: 'MCP test' } })).connected, true);
     const { id } = text(await client.callTool({ name: 'diagnose_start', arguments: { operation: 'system.inspect', arguments: {}, reason: 'Verify MCP execution' } }));
     const result = text(await client.callTool({ name: 'diagnose_wait', arguments: { id, timeoutMs: 5000, release: true } }));

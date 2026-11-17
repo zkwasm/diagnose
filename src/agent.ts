@@ -6,20 +6,27 @@ import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import { PairingStore } from './pairing.js';
-import { loadSkill, skillPrompt } from './skill.js';
+import { skillPrompt } from './skill.js';
+import { resolveSkill } from './skill-library.js';
+import { Cases } from './cases.js';
 import { agentCommand } from './agent-command.js';
 
-export const agentUsage = 'diagnose agent codex|claude|gemini [--device NAME] [--skill FILE.md|DIRECTORY] [--relay URL] [-- agent arguments...]';
+export const agentUsage = 'diagnose agent codex|claude|gemini [--device NAME] [--case ID] [--skill FILE.md|DIRECTORY|library:NAME@REVISION] [--relay URL] [-- agent arguments...]';
 
 export async function launchAgent(argv: string[]): Promise<number> {
   const separator = argv.indexOf('--');
   const extra = separator < 0 ? [] : argv.slice(separator + 1);
-  const { positionals, values } = parseArgs({ args: separator < 0 ? argv : argv.slice(0, separator), allowPositionals: true, options: { relay: { type: 'string' }, skill: { type: 'string' }, device: { type: 'string' }, help: { type: 'boolean', short: 'h' } } });
+  const { positionals, values } = parseArgs({ args: separator < 0 ? argv : argv.slice(0, separator), allowPositionals: true, options: { relay: { type: 'string' }, skill: { type: 'string' }, device: { type: 'string' }, case: { type: 'string' }, help: { type: 'boolean', short: 'h' } } });
   if (values.help || !positionals.length) { console.log(agentUsage); return 0; }
   const [agent] = positionals;
   if (positionals.length !== 1 || !['codex', 'claude', 'gemini'].includes(agent)) throw new Error(agentUsage);
   if (values.device) new PairingStore().get(values.device, 'operator');
-  const skill = values.skill === undefined ? undefined : await loadSkill(values.skill);
+  const selectedCase = values.case ? new Cases().get(values.case) : undefined;
+  if (selectedCase?.host && values.device && selectedCase.host !== values.device) throw new Error('Selected case belongs to a different paired computer');
+  if (selectedCase?.skill && values.skill && selectedCase.skill !== values.skill) throw new Error('Case skill revision differs from selected skill');
+  const skillInput = values.skill ?? selectedCase?.skill;
+  let skill = skillInput ? await resolveSkill(skillInput) : undefined;
+  if (selectedCase && !skill) skill = { sourceFile: '', baseDirectory: process.cwd(), sha256: '', instructions: 'Use diagnose_case show to read the selected case. Confirm the external target identity, inspect interfaces conservatively, diagnose the stated goal, apply only authorized repairs, and record evidence-backed verification. Propose a reusable skill draft if useful.' };
   if (skill && agent === 'gemini' && extra.some(arg => ['-p', '--prompt', '-i', '--prompt-interactive'].includes(arg) || arg.startsWith('--prompt=') || arg.startsWith('--prompt-interactive='))) throw new Error('--skill supplies the initial task; do not also pass a Gemini prompt option');
   if (values.relay) {
     const url = new URL(values.relay);
@@ -27,7 +34,7 @@ export async function launchAgent(argv: string[]): Promise<number> {
     if (url.username || url.password) throw new Error('Relay URL must not contain credentials');
   }
   // Reuse this exact installed version. No global install or extra npx download.
-  const server = { command: process.execPath, args: [fileURLToPath(new URL('./cli.js', import.meta.url)), 'mcp', ...(values.relay ? [values.relay] : []), ...(values.device ? ['--device', values.device] : [])] };
+  const server = { command: process.execPath, args: [fileURLToPath(new URL('./cli.js', import.meta.url)), 'mcp', ...(values.relay ? [values.relay] : []), ...(values.device ? ['--device', values.device] : []), ...(values.case ? ['--case', values.case] : [])] };
   const env = { ...process.env }; let directory: string | undefined;
   try {
     let prompt: string | undefined, taskDirectory: string | undefined;

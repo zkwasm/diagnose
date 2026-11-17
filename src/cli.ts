@@ -20,6 +20,8 @@ import { PairingStore, automatic, RememberedConnection } from './pairing.js';
 import { launchAgent, agentUsage } from './agent.js';
 import { History } from './history.js';
 import { cleanupLocal } from './maintenance.js';
+import { skillsCommand, skillsUsage } from './skill-library.js';
+import { knowledgeCommand, knowledgeUsage } from './knowledge-cli.js';
 
 async function attachTerminal(operator: Operator, id: string): Promise<void> {
   let done = false, cursor = 0; const wasRaw = stdin.isRaw;
@@ -32,8 +34,10 @@ async function attachTerminal(operator: Operator, id: string): Promise<void> {
 }
 
 async function main(): Promise<void> {
+  if (['cases', 'drafts', 'vault'].includes(process.argv[2])) { await knowledgeCommand(process.argv[2], process.argv.slice(3)); return; }
+  if (process.argv[2] === 'skills') { await skillsCommand(process.argv.slice(3)); return; }
   if (process.argv[2] === 'agent') { process.exitCode = await launchAgent(process.argv.slice(3)); return; }
-  const { positionals, values } = parseArgs({ args: process.argv.slice(2), allowPositionals: true, options: { 'session-minutes': { type: 'string', default: '60' }, 'idle-minutes': { type: 'string', default: '10' }, device: { type: 'string' }, name: { type: 'string' }, days: { type: 'string', default: '7' }, cursor: { type: 'string', default: '0' } } });
+  const { positionals, values } = parseArgs({ args: process.argv.slice(2), allowPositionals: true, options: { 'session-minutes': { type: 'string', default: '60' }, 'idle-minutes': { type: 'string', default: '10' }, device: { type: 'string' }, case: { type: 'string' }, name: { type: 'string' }, days: { type: 'string', default: '7' }, cursor: { type: 'string', default: '0' } } });
   const [command = 'help', relay = 'https://diagnose.fenginwind.com'] = positionals;
   if (command === 'history') { console.log(safeText(JSON.stringify(new History().list(), null, 2))); return; }
   if (command === 'show') { const cursor = Number(values.cursor); if (!Number.isSafeInteger(cursor) || cursor < 0) throw new Error('Cursor must be a nonnegative integer'); console.log(safeText(JSON.stringify(new History().show(positionals[1] ?? '', cursor), null, 2))); return; }
@@ -43,8 +47,8 @@ async function main(): Promise<void> {
   if (![sessionMinutes, idleMinutes].every(value => Number.isInteger(value) && value >= 0 && value <= 10080)) throw new Error('Timeouts must be 0..10080 minutes; 0 disables endpoint timeout (relay maximum 7 days)');
   if (command === 'devices') { console.log(JSON.stringify(new PairingStore(join(homedir(), '.diagnose', 'pairings')).list('operator').map(({ name, id, relay }) => ({ name, id, relay })), null, 2)); return; }
   if (command === 'forget') { const store = new PairingStore(join(homedir(), '.diagnose', 'pairings')); store.remove(store.get(values.device ?? '', 'operator').id); console.log('Local pairing removed. Revoke on the user computer to invalidate its credential.'); return; }
-  if (command === 'mcp') { await serveMcp(relay, values.device); return; }
-  if (!['start', 'connect', 'terminal', 'pair'].includes(command)) { console.log(`diagnose start|connect|terminal|mcp [relay-url] [--device NAME]\ndiagnose pair [relay-url] --name NAME\ndiagnose history\ndiagnose show ID [--cursor OFFSET]\ndiagnose cleanup [--days 7]\ndiagnose devices\ndiagnose forget --device NAME\n${agentUsage}\nNode.js >=20.10. Pairing codes are entered interactively, never as arguments.`); return; }
+  if (command === 'mcp') { await serveMcp(relay, values.device, values.case); return; }
+  if (!['start', 'connect', 'terminal', 'pair'].includes(command)) { console.log(`diagnose start|connect|terminal|mcp [relay-url] [--device NAME]\ndiagnose pair [relay-url] --name NAME\ndiagnose history\ndiagnose show ID [--cursor OFFSET]\ndiagnose cleanup [--days 7]\ndiagnose devices\ndiagnose forget --device NAME\n${agentUsage}\n${skillsUsage}\n${knowledgeUsage}\nNode.js >=20.10. Pairing codes are entered interactively, never as arguments.`); return; }
   if (!stdin.isTTY || !stdout.isTTY) throw new Error('Interactive terminal required. AI clients should use diagnose mcp.');
   const rl = createInterface({ input: stdin, output: stdout });
   const shutdown = new AbortController(); let peer: Peer | undefined, engine: ProbeEngine | undefined;

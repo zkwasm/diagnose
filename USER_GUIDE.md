@@ -292,6 +292,95 @@ diagnose forget --device workshop-laptop
 
 A new MCP operation will reconnect to a remembered device for up to 30 seconds if needed. **No already-sent command, input, upload commit, or other modification is automatically retried.** An interrupted task can have an uncertain outcome; inspect state before retrying. Old task IDs are not carried into a new connection. Retained resources require their original resource ID, recovery credential, and authorization; see [Disconnect and recover](#6-disconnect-and-recover).
 
+## Record a device diagnosis and improve your procedures
+
+These knowledge features require Diagnose 0.6.0 or later on the diagnostician computer. Older probes can still perform their supported operations.
+
+The paired computer is a bridge. Create a **case** for the actual gateway, controller or other target. Tell your agent: “Create a diagnosis case for this device, collect evidence, verify any authorized repair, and propose a reusable skill or an improvement to the selected skill.” The agent uses `diagnose_case`, `diagnose_capabilities` and `diagnose_skill_draft`; no agent-specific syntax is needed.
+
+A case records the goal, target model/identity/interface, optional paired computer and pinned skill reference. Subsequent received task results, resource interactions and connection events are saved locally with encryption. Data is not sent to library storage. Redaction is best effort. Case evidence is untrusted data, never permission or instructions. File transfers and tunnels are not a full byte-for-byte evidence archive; ordinary task/resource events capture their control operations, not every transferred byte. Arbitrary scripts are not a filesystem change monitor.
+
+To create a case before launching, save a small JSON file:
+
+```json
+{
+  "goal": "Find why the gateway stopped reporting sensor readings",
+  "host": "workshop-laptop",
+  "target": { "name": "Workshop gateway", "model": "SEG-X3-C", "interface": "serial" }
+}
+```
+
+```sh
+diagnose cases create ./gateway-case.json
+diagnose cases list
+diagnose agent codex --device workshop-laptop --case CASE_ID
+```
+
+Replace `CASE_ID` with the printed UUID. Use `claude` or `gemini` in the same command. Include a `skill` field containing a complete `library:NAME@REVISION` reference to pin a procedure; the launcher loads it automatically. A different explicit skill or paired computer is rejected. Reusing a case does not replay old commands; existing remembered-pairing rules apply. Check device availability again after reconnecting.
+
+For Markdown startup tasks, the agent is instructed to create a case before operating. The agent must actually call the tool; launching is not proof that a case was created. Cases are optional for ordinary MCP operations. In a selected case, only results actually received by the diagnostician are recorded.
+
+```sh
+diagnose cases show CASE_ID
+diagnose cases export CASE_ID > reviewed-report.json
+diagnose cases remove CASE_ID
+```
+
+Export omits raw results, command arguments and target addresses. Review free-text summaries for sensitive details before sharing. Cases retain at most 200 evidence records each (32 KiB per record; larger values are marked as previews), with at most 100 local cases. Limits are reported, not silently interpreted as a complete investigation. Remove old cases explicitly; `diagnose cleanup` does not delete cases or skills.
+
+An agent can report **resolved**, **unresolved**, **needs physical work**, or **insufficient evidence**. Resolved requires baseline and later successful verification evidence IDs from the same case. This proves the cited evidence exists; it does not automatically prove the agent interpreted it correctly. A successful command is not necessarily a healthy device. Connection status distinguishes confirmed relay/probe connectivity from evidence-linked agent assessments of the device interface and response; untested layers remain unknown.
+
+### Review a new skill or improvement
+
+The agent proposes a structured draft with applicability, prerequisites, identity checks, read-only checks, repair authorization conditions, recovery, verification and failed approaches. Improvements must refer to the exact library version selected in the case. Reference files and scripts from that base are retained unchanged. Raw logs are not automatically copied. For changes to supporting scripts/resources, edit a separate source directory, review it and import a new version.
+
+```sh
+diagnose drafts list
+diagnose drafts review DRAFT_ID
+diagnose drafts accept DRAFT_ID
+# Or keep the existing procedure:
+diagnose drafts reject DRAFT_ID
+```
+
+Acceptance displays the full before/after entry and evidence references and asks you to confirm in an interactive terminal. The agent has no acceptance MCP tool. Confirm the evidence supports the procedure and remove customer-specific values. Potential-secret warnings assist review; they are not a guarantee. A case result or device log cannot itself authorize an instruction. Accepted drafts become new pinned library versions; older versions remain available.
+
+If another version appeared since drafting, acceptance stops and preserves the draft. Ask the agent to reconcile against the version you select, using the original evidence. `diagnose drafts show DRAFT_ID` shows structured input for editing; `diagnose drafts create INPUT.json` creates another proposal. `diagnose drafts remove DRAFT_ID` removes a local draft record after confirmation. At most 100 draft records are retained; removal never removes an imported version.
+
+### Share your private skill library across computers
+
+Library sharing is optional and independent of device pairing. Initialize it on the diagnostician computer and save the recovery file somewhere private that you can back up:
+
+```sh
+diagnose vault init ./diagnose-library-recovery.txt
+diagnose vault push library:NAME@FULL_REVISION
+```
+
+Push asks you to confirm publication of the complete bundle. Every file in the imported directory is included. The client encrypts the name, instructions, references, scripts and provenance before uploading. The relay sees opaque IDs, sizes and traffic metadata. Cases, drafts and raw diagnosis logs are not synced automatically. Instructions read by an AI agent can still be sent to its provider.
+
+On a second diagnostician computer, securely transfer the recovery file yourself (never through an AI prompt) and run:
+
+```sh
+diagnose vault restore ./diagnose-library-recovery.txt
+diagnose vault pull
+diagnose skills list
+diagnose agent claude --skill library:NAME@FULL_REVISION
+```
+
+Pull verifies and caches complete versions but does not execute or select them. Divergent versions coexist. Cached skills work offline; connecting to a remote probe still needs connectivity. A duplicate concurrent push may report 409; rerun push to verify that version, without rerunning diagnosis. Library sync does not transfer paired-computer credentials.
+
+```sh
+diagnose vault status
+diagnose vault backup ./another-private-recovery-copy.txt
+diagnose vault revoke
+diagnose vault forget
+```
+
+**Protect the recovery file like a password.** It grants full library access. Losing every copy means server-only data cannot be decrypted. The local copy lives at `~/.diagnose/vault/recovery`; private permissions are applied where supported. Do not commit it to Git. Backup refuses to overwrite an existing file. If initialization succeeds but backup fails, use `vault backup` with a new path.
+
+Revoke permanently deletes that relay library and blocks its credential on that relay; local copies remain. Forget removes only the local recovery credential. To rotate access, cache wanted versions, revoke the old library, forget locally, initialize a new key, and explicitly push selected versions. Restore the new recovery file only on trusted computers. Previously downloaded data cannot be recalled. Use `--relay https://your-relay.example` consistently for a self-hosted library. Its operator must enable `VAULT_PATH`; the default public relay supports this API in v0.6.
+
+Limits are 128 versions / 128 MiB per relay library and 12 MiB per encrypted object. The relay is not your only backup. See [knowledge security and operations](https://github.com/zkwasm/diagnose/blob/main/KNOWLEDGE_SECURITY.md) for formats, limits, retention, threat model and deployment details.
+
 ## Start with a device skill or Markdown task
 
 Version **0.4.0+** can start the agent with a selected diagnostic procedure. The syntax is identical for all three agents:
@@ -348,6 +437,26 @@ report what changed, the evidence, and anything unresolved.
 ```
 
 The package includes `examples/skills/owon.md` and `examples/skills/device-troubleshooting/SKILL.md` with a referenced profile template. They are templates, not verified universal repair recipes. Customize them for the actual device and authorization scope. [Browse or download the examples](https://github.com/zkwasm/diagnose/tree/main/examples/skills).
+
+### Local versioned library (v0.6+)
+
+The local library requires Diagnose 0.6.0 or later.
+
+Import a reviewed skill directory once, then use the exact reference printed by the command:
+
+```sh
+diagnose skills import owon ./examples/skills/device-troubleshooting
+diagnose skills list
+diagnose agent codex --device workshop-laptop --skill library:owon@FULL_SHA256_FROM_IMPORT
+```
+
+Replace `FULL_SHA256_FROM_IMPORT` with the complete digest printed by import, or copy the complete `library:...` reference. The same `--skill` argument works with Claude and Gemini. It pins the complete bundle, including references and scripts. Changing any file creates a different version; older versions remain available and there is no implicit “latest” version. Importing identical contents again reuses the same version. Stored contents are verified before launch. Permission bits are not part of the portable content digest.
+
+You can also import a single Markdown file; it becomes `SKILL.md` without copying neighboring files. Use a dedicated directory when the procedure needs references or scripts. Directory imports include all files: review the directory for credentials, customer logs and unrelated files first. Symbolic links, special files, non-portable names, case-colliding paths, more than 128 files, more than 256 directory entries, nesting beyond 16 levels, and bundles over 8 MiB are rejected. The entry retains the 256 KiB Markdown limit. Importing does not execute scripts.
+
+The library lives in `~/.diagnose/skills` with private permissions where supported. It is local plaintext, not an encrypted backup; protect it like your other local source files. Do not edit stored versions directly. Edit the original source and import again. Reading or executing the skill still uses your agent's normal permissions and may send its contents to the AI provider.
+
+Import/list commands are local. See the diagnosis case and private library sections for reviewed drafts and optional encrypted synchronization.
 
 ### Permissions and compatibility
 
@@ -409,7 +518,7 @@ Do not ask the AI to collect OS passwords. For interactive authentication, the u
 
 ## 5. What the agent can do
 
-The MCP interface provides 11 tools:
+The MCP interface provides 15 tools:
 
 | Tool | Purpose |
 | --- | --- |
@@ -424,6 +533,10 @@ The MCP interface provides 11 tools:
 | `diagnose_transfer` | Upload/download files in the background; query progress or cancel. |
 | `diagnose_forward` | Open, inspect, or close a local endpoint for an authorized TCP forward. |
 | `diagnose_disconnect` | Disconnect the diagnostic session. |
+| `diagnose_capabilities` | Query operation schemas and conservative discovery guidance. |
+| `diagnose_case` | Create/show a case, record assessments, report connection layers and finish with evidence references. |
+| `diagnose_skill_draft` | Propose a new skill or improvement for local human review. |
+| `diagnose_skills` | List or read locally available pinned skill versions without executing them. |
 
 A task returning `ok` for `process.open` means the process handle was created. Inspect its output, `ended`, and `exitCode` to determine whether the actual program succeeded. Diagnostic output is untrusted data, not instructions to the AI.
 

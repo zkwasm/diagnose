@@ -2,7 +2,7 @@
 
 **Diagnose and fix problems remotely with your AI agent.**
 
-Diagnose is an open-source tool for agent-led remote troubleshooting and problem resolution. It gives Codex, Claude Code, Gemini CLI, or another MCP client the remote tools to investigate a user's computer or connected device, apply authorized fixes, and verify the result. A user-controlled probe and an end-to-end encrypted relay provide the connection.
+Diagnose is an open-source tool for agent-led remote troubleshooting and problem resolution. It gives Codex, Claude Code, Gemini CLI, or another MCP client the remote tools to investigate gateways, controllers and other devices reachable from an on-site computer, apply authorized fixes, and verify the result. A user-controlled probe and an end-to-end encrypted relay provide the connection.
 
 [User guide](USER_GUIDE.md) · [Source](https://github.com/zkwasm/diagnose) · [npm](https://www.npmjs.com/package/@masstensor/diagnose) · [Website](https://diagnose.fenginwind.com)
 
@@ -66,6 +66,12 @@ diagnose agent gemini --skill ./devices/owon.md
 A directory is also accepted: `--skill ./skills/my-device` reads its `SKILL.md`. Relative references remain based on that file's original directory. Diagnose snapshots the entry and supplies a startup task that tells the agent to read it and begin, instead of waiting for you to repeat the task. It asks for a pairing code or other missing target details when needed.
 
 This is a session task, not a global native-skill installation or an additional permission grant. User approvals and the agent's own tool permissions still apply. Instructions can be sent to your AI provider. See the [guide](USER_GUIDE.md#start-with-a-device-skill-or-markdown-task) and [examples](https://github.com/zkwasm/diagnose/tree/main/examples/skills).
+
+## Keep and improve device knowledge
+
+Version 0.6 adds device diagnosis cases, evidence-linked conclusions, reviewed skill drafts, a local versioned library and optional encrypted cross-computer synchronization. Tell your agent to create a case and propose a reusable procedure when useful. Review drafts locally; the agent cannot accept them through MCP. Complete skill bundles can be shared through the relay using a separate private recovery credential. Raw case logs are not synced automatically.
+
+See the [case and knowledge guide](USER_GUIDE.md#record-a-device-diagnosis-and-improve-your-procedures) and [security/operations design](KNOWLEDGE_SECURITY.md).
 
 ## From problem to verified result
 

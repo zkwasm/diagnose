@@ -41,7 +41,7 @@ for (const agent of ['codex', 'claude', 'gemini']) test(`agent ${agent} loads re
   const f = fixture(), before = readFileSync(f.settings, 'utf8');
   const result = await run(['agent', agent, '--relay', 'https://relay.example.test', '--', '--model', 'a model with spaces', 'literal $(do-not-execute)'], { ...process.env, HOME: f.root, PATH: f.root + ':' + process.env.PATH, GEMINI_CLI_HOME: f.root, TEST_CAPTURE: f.capture, TEST_EXIT: '7' });
   assert.equal(result.code, 7, result.output); const captured = JSON.parse(readFileSync(f.capture, 'utf8'));
-  assert.equal(captured.server.command, process.execPath); assert.deepEqual(captured.server.args, [cli, 'mcp', 'https://relay.example.test']); assert.equal(captured.tools.length, 11); assert.ok(captured.tools.includes('diagnose_pair')); assert.ok(captured.tools.includes('diagnose_process'));
+  assert.equal(captured.server.command, process.execPath); assert.deepEqual(captured.server.args, [cli, 'mcp', 'https://relay.example.test']); assert.equal(captured.tools.length, 15); assert.ok(captured.tools.includes('diagnose_pair')); assert.ok(captured.tools.includes('diagnose_process'));
   assert.deepEqual(captured.args.slice(-3), ['--model', 'a model with spaces', 'literal $(do-not-execute)']);
   assert.equal(readFileSync(f.settings, 'utf8'), before); for (const name of ['.codex', '.claude', '.gemini']) assert.equal(readFileSync(join(f.root, name, 'sentinel'), 'utf8'), 'unchanged');
   if (agent === 'gemini') { assert.equal(captured.admin.marker, 'preserve-admin-policy'); assert.equal(existsSync(captured.settingsPath), false); }
@@ -85,6 +85,20 @@ test('skill directory is accepted, and invalid skills fail before launching an a
   const conflict = await run(['agent', 'gemini', '--skill', skill, '--', '--prompt', 'another task'], env); assert.equal(conflict.code, 1); assert.match(conflict.output, /initial task/);
 });
 
+for (const agent of ['codex', 'claude', 'gemini']) test(`agent ${agent} launches a pinned library bundle through the CLI`, { skip: process.platform === 'win32', timeout: 15000 }, async () => {
+  const f = fixture(), source = join(f.root, 'source'); mkdirSync(source); mkdirSync(join(source, 'references'));
+  writeFileSync(join(source, 'SKILL.md'), '# Library task\nRead references/profile.md.'); writeFileSync(join(source, 'references/profile.md'), 'Model A');
+  const env = { ...process.env, HOME: f.root, PATH: f.root + ':' + process.env.PATH, GEMINI_CLI_HOME: f.root, TEST_CAPTURE: f.capture };
+  const imported = await run(['skills', 'import', 'gateway', source], env); assert.equal(imported.code, 0, imported.output);
+  const reference = imported.output.trim(); assert.match(reference, /^library:gateway@[a-f0-9]{64}$/);
+  const listed = await run(['skills', 'list'], env); assert.deepEqual(JSON.parse(listed.output), [reference]);
+  const launched = await run(['agent', agent, '--skill', reference], env); assert.equal(launched.code, 0, launched.output);
+  const captured = JSON.parse(readFileSync(f.capture, 'utf8'));
+  assert.equal(captured.task.instructions, '# Library task\nRead references/profile.md.');
+  assert.equal(readFileSync(join(captured.task.baseDirectory, 'references/profile.md'), 'utf8'), 'Model A');
+  assert.ok(captured.task.baseDirectory.includes(reference.split('@')[1]));
+});
+
 test('termination also removes the skill snapshot', { skip: process.platform === 'win32', timeout: 10000 }, async () => {
   const f = fixture(), source = join(f.root, 'task.md'); writeFileSync(source, '# Test task');
   const child = spawn(process.execPath, [cli, 'agent', 'codex', '--skill', source], { env: { ...process.env, HOME: f.root, PATH: f.root + ':' + process.env.PATH, TEST_CAPTURE: f.capture, TEST_WAIT: '1' }, stdio: 'ignore' }); const exit = new Promise<number | null>(resolveExit => child.once('close', resolveExit));
@@ -101,4 +115,15 @@ for (const agent of ['codex', 'claude', 'gemini']) test(`selected startup task r
     const result = await run(['agent', agent, '--skill', task, '--relay', url], { ...process.env, HOME: f.root, PATH: f.root + ':' + process.env.PATH, GEMINI_CLI_HOME: f.root, TEST_CAPTURE: f.capture, TEST_PAIR_CODE: code, TEST_REMOTE_TARGET: target });
     assert.equal(result.code, 0, result.output); const captured = JSON.parse(readFileSync(f.capture, 'utf8')); assert.equal(captured.workflow.result.status, 'ok'); assert.equal(captured.workflow.outputs['1.file'], 'fixed'); assert.equal(readFileSync(target, 'utf8'), 'fixed'); assert.deepEqual(stages, ['execute', 'send']); assert.ok(!captured.args.join(' ').includes(code));
   } finally { engine.cancelAll(); host.close(); await relay.close(); }
+});
+
+for (const agent of ['codex', 'claude', 'gemini']) test(`agent ${agent} starts the selected case with its pinned skill`, { skip: process.platform === 'win32', timeout: 15000 }, async () => {
+  const { Cases } = await import('../dist/cases.js'), { SkillLibrary } = await import('../dist/skill-library.js');
+  const f = fixture(), source = join(f.root, 'task.md'); writeFileSync(source, '# Case procedure');
+  const reference = await new SkillLibrary(join(f.root, '.diagnose', 'skills')).import('gateway', source);
+  const selected = new Cases(join(f.root, '.diagnose', 'cases')).create({ goal: 'Check device logs', target: { name: 'Gateway', interface: 'serial' }, skill: reference });
+  const env = { ...process.env, HOME: f.root, PATH: f.root + ':' + process.env.PATH, GEMINI_CLI_HOME: f.root, TEST_CAPTURE: f.capture };
+  const result = await run(['agent', agent, '--case', selected.id], env); assert.equal(result.code, 0, result.output);
+  const captured = JSON.parse(readFileSync(f.capture, 'utf8')); assert.equal(captured.task.libraryReference, reference); assert.deepEqual(captured.server.args.slice(-2), ['--case', selected.id]);
+  const conflict = await run(['agent', agent, '--case', selected.id, '--skill', source], env); assert.equal(conflict.code, 1); assert.match(conflict.output, /revision differs/);
 });

@@ -1,6 +1,6 @@
 diagnose.fenginwind.com {
     encode zstd gzip
-    @relay path /v1/connect /healthz /downloads/*
+    @relay path /v1/connect /v1/library /v1/library/* /healthz /downloads/*
     handle @relay {
         reverse_proxy 127.0.0.1:8792
     }

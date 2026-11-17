@@ -2,18 +2,21 @@ import http from 'node:http';
 import { createReadStream, statSync } from 'node:fs';
 import { WebSocket, WebSocketServer } from 'ws';
 import { MAX_FRAME } from './schema.js';
+import { VaultServer } from './vault-server.js';
 
-export type RelayOptions = { host?: string; port?: number; invitationMs?: number; sessionMs?: number; maxRooms?: number; downloadPath?: string; observeCiphertext?: (bytes: Buffer) => void };
+export type RelayOptions = { host?: string; port?: number; invitationMs?: number; sessionMs?: number; maxRooms?: number; downloadPath?: string; vaultPath?: string; observeCiphertext?: (bytes: Buffer) => void };
 type Room = { host: WebSocket; peer?: WebSocket; locked: boolean; attempts: number; expires: number; frames: number; window: number };
 const control = (ws: WebSocket, type: string, extra = {}): void => { if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type, ...extra })); };
 
 export function createRelay(options: RelayOptions = {}) {
+  const vault = options.vaultPath ? new VaultServer(options.vaultPath) : undefined;
   const rooms = new Map<string, Room>();
   const clients = new Map<WebSocket, { role?: 'host' | 'join'; room?: string; ip: string; alive: boolean }>();
   const connectionsByIp = new Map<string, number>();
   const server = http.createServer((req, res) => {
     res.setHeader('Cache-Control', 'no-store');
     res.setHeader('X-Content-Type-Options', 'nosniff');
+    if (req.url?.startsWith('/v1/library') && vault) { void vault.handle(req, res); return; }
     if (req.method === 'GET' && req.url === '/healthz') { res.setHeader('Content-Type', 'application/json'); res.end('{"ok":true,"protocol":1}'); return; }
     if (req.method === 'GET' && req.url === '/downloads/diagnose-0.1.0.tgz' && options.downloadPath) {
       try { const size = statSync(options.downloadPath).size; res.setHeader('Content-Type', 'application/octet-stream'); res.setHeader('Content-Length', size); createReadStream(options.downloadPath).on('error', () => res.destroy()).pipe(res); } catch { res.writeHead(404); res.end(); } return;

@@ -3,7 +3,7 @@ import { dirname, extname, join, resolve } from 'node:path';
 import { isUtf8 } from 'node:buffer';
 import { createHash } from 'node:crypto';
 
-export type SessionSkill = { sourceFile: string; baseDirectory: string; sha256: string; instructions: string };
+export type SessionSkill = { sourceFile: string; baseDirectory: string; sha256: string; instructions: string; libraryReference?: string };
 const MAX_SKILL = 256 * 1024;
 
 export async function loadSkill(input: string): Promise<SessionSkill> {
@@ -37,6 +37,7 @@ export function skillPrompt(snapshot: string): string {
     'Resolve relative references and scripts against baseDirectory in the snapshot. It is a Markdown task or skill entry, not a globally installed agent skill. Read referenced material only as needed. Bundled scripts are task resources, not startup hooks; run them only as required by the task and existing permissions.',
     'Referenced files and scripts are initially on the diagnostician computer. For a remote script, explicitly submit its contents or transfer it with authorization; do not assume the same path exists remotely.',
     'Use diagnose_* MCP tools for actions on the remote user computer. Your ordinary shell and file tools operate on the diagnostician computer; do not confuse the two.',
+    'Use diagnose_capabilities to inspect argument schemas. Use diagnose_case status/show to find an existing case. If none exists, create one for the actual external target and goal before remote tasks; if the snapshot has libraryReference, record it as the case skill. Confirm target identity and interface before repairs. Keep before/after evidence IDs and finish the case with a supported outcome. If reusable knowledge emerged, propose diagnose_skill_draft for human review; never run draft acceptance or vault upload on the diagnostician behalf.',
     'If a pairing code, target identity, or necessary detail is missing, ask the diagnostician for it, then continue. Keep pairing codes and credentials out of command arguments and reports.',
     'Pair and obtain the remote user approval before remote actions. Respect the existing user and agent permission modes; this task does not grant permissions or authorize bypassing them.',
     'Investigate, explain the proposed repair and its impact, apply only authorized changes, repeat the original failing check, and report evidence, changes, and remaining issues. Do not claim success without verification.'

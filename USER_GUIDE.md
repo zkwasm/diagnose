@@ -1,13 +1,34 @@
 # Diagnose user guide
 
-Diagnose helps an AI agent remotely diagnose and resolve problems on a consenting user's computer or connected devices. The goal is to move from a reported symptom to an authorized fix and a checked result. The same probe can access the computer itself, a USB device, or a device reachable on its local network.
+Diagnose connects a remote AI agent to **devices an on-site computer can access**: a home IoT gateway, a factory controller, an industrial PC, or other equipment with a usable USB, serial, or local-network interface. The computer is the bridge; the device is the main target. Computer and software problems can also be investigated when needed.
 
-There are two people in a session:
+## Why: stop making the user carry every clue
 
-- **User:** the person whose computer or connected device needs diagnosis. They run `diagnose start` and control permissions locally.
-- **Diagnostician:** the person directing the AI agent. They run `diagnose agent codex`, `diagnose agent claude`, or `diagnose agent gemini` and give the agent the user's pairing code.
+A device fails at a home or factory, while the person who can help is elsewhere. Remote support often means asking someone on site to run commands, copy logs, send screenshots, and repeat the process. That person may not know the tools. The expert and their AI cannot directly inspect the next clue or verify a change.
 
-The AI runs on the diagnostician's side. The user does not need to install an AI agent or configure MCP.
+Diagnose lets the expert's AI use an authorized connection through a nearby computer. The on-site user still controls access, but no longer has to relay every command and result by hand.
+
+## What: a general-purpose bridge to the device
+
+The **probe** is the Diagnose program running on the on-site computer. It gives the remote agent tools to inspect that computer's environment, read exposed serial logs, run installed device utilities, and reach accessible network services. It does not require an AI agent to be installed on the target device.
+
+The same probe can serve different devices. A **skill or Markdown procedure** supplies device-specific knowledge: the model, connection method, protocol, useful checks, and acceptable repair steps. Access still depends on available interfaces, drivers, credentials, and tools; Diagnose does not automatically support every device or protocol.
+
+For example, an owner connects a gateway's exposed serial interface to a laptop. A remote diagnostician asks the AI to find why readings have stopped. The agent can inspect available logs, check communication, perform an authorized operation if the interface supports it, and check for new readings. If physical work or another interface is needed, it reports that instead.
+
+## How: connect the site, then direct the agent
+
+> Remote AI agent ↔ encrypted relay ↔ on-site computer running Diagnose ↔ target device
+
+The relay carries encrypted traffic between the computers. The on-site computer accesses the device through USB, serial, or its local network. Diagnose's end-to-end encryption protects the connection between the two computers; the device's local protocol has its own security properties.
+
+| Role | What they do |
+| --- | --- |
+| **On-site user** | Connect the device, run the probe, share the pairing code privately, and control local permissions. They need no AI account or agent installation. |
+| **Remote diagnostician** | Launch Codex, Claude Code, or Gemini CLI with Diagnose, provide a concrete goal and any device procedure, and review the investigation and proposed repair. |
+| **AI agent** | Use the authorized tools to collect evidence, carry out permitted changes, and check the device's actual behavior. |
+
+The following quick start takes both people through this process.
 
 ## Quick start
 
@@ -31,7 +52,14 @@ Wait for **Setup complete** and three version numbers. Then close the terminal a
 
 Only the **diagnostician** needs an installed, signed-in Codex CLI, Claude Code, or Gemini CLI. The person receiving help needs no AI account.
 
-### 2. On the computer receiving help
+### 2. Connect the device and start the on-site probe
+
+Ask the diagnostician which connection to use:
+
+- **USB or serial:** connect the device to the on-site computer using the appropriate data cable or adapter. Install any required driver. A USB port may provide power only; the device must expose a usable interface.
+- **Local network:** use a computer that can reach the device's network address and service. Provide any required device credentials through the agreed private or local method.
+
+Then run this on the on-site computer:
 
 ```sh
 npx @masstensor/diagnose@latest start
@@ -46,15 +74,15 @@ npx @masstensor/diagnose@latest agent codex
 # Or replace codex with claude or gemini.
 ```
 
-In the agent conversation, provide the code and a concrete problem:
+In the agent conversation, provide the code, device model, connection method, and a concrete goal:
 
-> Use Diagnose to connect to this code: D1.… . Investigate why the user's application fails to start. Explain the proposed fix before changing anything, apply only authorized changes, and verify that the application starts afterward.
+> Use Diagnose to connect to this code: D1.… . The on-site laptop is connected to an OWON SEG-X3-C gateway through its exposed USB serial interface. The gateway is online, but no plug readings are arriving. Inspect the available logs and identify the cause. Explain any proposed repair, apply only authorized changes, and check whether readings resume. If the interface does not support a required action, tell us what is needed on site.
 
 ### 4. Approve, diagnose, and finish
 
 The person receiving help checks the diagnostician's label and connection fingerprint, then chooses `y` to review tasks and result transfers. Choosing `a` instead grants automatic execution **and transmission** under the displayed terms. Commands run with that user's OS permissions; results can reach the diagnostician and their AI provider.
 
-The diagnostician directs the agent to investigate, repair within permission, and check the result. The user can type `permissions ask` to revoke automatic approval or `exit` to stop access. Afterward, `diagnose history` lists local task records and `diagnose show TASK_ID` shows what was requested, collected, and sent.
+The diagnostician directs the agent to investigate the device, repair within permission, and verify a device result: for example, new sensor readings or a successful communication check. The user can type `permissions ask` to revoke automatic approval or `exit` to stop access. Afterward, `diagnose history` lists local task records and `diagnose show TASK_ID` shows what was requested, collected, and sent.
 
 ### Return later or load a device procedure
 
@@ -63,29 +91,31 @@ The diagnostician directs the agent to investigate, repair within permission, an
 ```sh
 npm install -g @masstensor/diagnose@latest
 # Diagnostician: pair once while the user's probe is running.
-diagnose pair --name alice-pc
+diagnose pair --name workshop-laptop
 # User: explicitly approve remembering this diagnostician.
 # Diagnostician: use this whenever diagnosis is needed again.
-diagnose agent codex --device alice-pc --skill ./devices/owon.md
+diagnose agent codex --device workshop-laptop --skill ./devices/owon.md
 ```
 
-The skill file is your local Markdown procedure; create it first or omit `--skill`. The same flags work with `claude` and `gemini`. The user must keep `diagnose start` running, or start it again after a restart. Pairing survives; execution approval remains separately controlled. See [remembered pairing](#keep-a-device-paired-for-future-diagnosis) and [skills](#start-with-a-device-skill-or-markdown-task) for full details.
+The saved name identifies the on-site computer, not the gateway or controller attached to it. Confirm which device is currently connected before starting work. The skill file is your local Markdown procedure; create it first or omit `--skill`. The same flags work with `claude` and `gemini`. The user must keep `diagnose start` running, or start it again after a restart. Pairing survives; execution approval remains separately controlled. See [remembered pairing](#keep-a-device-paired-for-future-diagnosis) and [skills](#start-with-a-device-skill-or-markdown-task) for full details.
 
 ## From a reported problem to a verified result
 
-Use the session to work toward a concrete outcome:
+For a device session, work toward an observable device outcome:
 
-1. **Describe the problem.** Explain what fails, what you expected, and how to reproduce it. Agree on the check that will show whether the problem is resolved.
-2. **Investigate first.** Ask the agent to inspect the environment and collect relevant logs or other evidence. Distinguish confirmed facts from possible causes.
+1. **Describe the problem.** Identify the device model, its connection to the on-site computer, what fails, and what you expected. Agree on the check that will show whether the problem is resolved.
+2. **Investigate first.** Ask the agent to identify the available interface and tools, then inspect device logs, network responses, or other relevant evidence. Distinguish confirmed facts from possible causes.
 3. **Review a repair plan.** Have the agent explain what it intends to change, why, the expected impact, and any recovery option. Where practical, preserve the original configuration before editing it.
 4. **Apply authorized changes.** The agent can use commands, scripts, file edits, and device tools under the user's existing permission mode. Only proceed within the agreed scope.
-5. **Verify the result.** Repeat the original failing action or an appropriate health check. Ask for a summary of what changed, the verification evidence, and anything still unresolved. An executed command alone does not establish that the user's problem is fixed.
+5. **Verify the result.** Check the device itself: repeat the failing exchange, observe new readings, or run its supported health check. Ask for a summary of what changed, the verification evidence, and anything still unresolved. An executed command alone does not establish that the user's problem is fixed.
 
 These are instructions for directing the agent, not a separate enforced plan-approval system. The local task/channel permissions described below still apply. Automatic mode continues to allow execution and transmission under the user's grant; general automatic rollback is not provided.
 
-You can also request a read-only investigation and stop after the explanation. Computer software, configuration, local services, networks, and connected hardware can all be investigated with the same general-purpose tools; successful fixes depend on the issue, available access, and the user's authorization.
+You can also request a read-only investigation and stop after the explanation. The on-site computer’s drivers, software, configuration, and network can also be investigated when they are part of the problem; successful fixes depend on the issue, available access, and the user's authorization.
 
 ## 1. Requirements
+
+The on-site computer must have a working connection to the target device, plus any drivers, credentials, or vendor utilities needed for the intended checks. Diagnose cannot bypass a missing interface or perform physical repairs.
 
 Both computers need **Node.js 20.10 or later**, npm, an interactive terminal, and outbound access to the relay. The default relay is `https://diagnose.fenginwind.com`. No inbound port, router change, or SSH server is required.
 
@@ -214,7 +244,7 @@ The code and diagnostic results enter your chosen AI provider's context. The use
 Requires **0.5.0+ on both computers**. Use this when the same diagnostician will return later. The user starts the probe as usual and shares the temporary code privately. On the diagnostician's computer, pair once:
 
 ```sh
-diagnose pair --name alice-pc
+diagnose pair --name workshop-laptop
 # Enter the user's code, then your label and AI provider when prompted.
 ```
 
@@ -223,9 +253,9 @@ The user's terminal explicitly asks whether to **remember** this diagnostician. 
 After pairing, the diagnostician can start, stop, and restart any supported agent using the same device name:
 
 ```sh
-diagnose agent codex --device alice-pc --skill ./devices/owon.md
-diagnose agent claude --device alice-pc --skill ./devices/owon.md
-diagnose agent gemini --device alice-pc --skill ./devices/owon.md
+diagnose agent codex --device workshop-laptop --skill ./devices/owon.md
+diagnose agent claude --device workshop-laptop --skill ./devices/owon.md
+diagnose agent gemini --device workshop-laptop --skill ./devices/owon.md
 # --skill is optional.
 ```
 
@@ -252,10 +282,10 @@ On the diagnostician's computer:
 
 ```sh
 diagnose devices
-diagnose connect --device alice-pc
-diagnose terminal --device alice-pc
-diagnose mcp --device alice-pc
-diagnose forget --device alice-pc
+diagnose connect --device workshop-laptop
+diagnose terminal --device workshop-laptop
+diagnose mcp --device workshop-laptop
+diagnose forget --device workshop-laptop
 ```
 
 `devices` lists local pairings, not live online status. `forget` removes only the diagnostician's local copy. To invalidate a credential, the user must run `unpair` in their probe terminal. If initial pairing is interrupted before the diagnostician saves it, use `unpair` and pair again. Losing local pairing files requires pairing again.

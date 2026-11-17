@@ -1,3 +1,17 @@
 diagnose.fenginwind.com {
-    reverse_proxy 127.0.0.1:8792
+    encode zstd gzip
+    @relay path /v1/connect /healthz /downloads/*
+    handle @relay {
+        reverse_proxy 127.0.0.1:8792
+    }
+    handle {
+        root * /var/www/diagnose/current
+        header {
+            X-Content-Type-Options nosniff
+            Referrer-Policy strict-origin-when-cross-origin
+            Permissions-Policy "camera=(), microphone=(), geolocation=()"
+            Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; media-src 'self'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'"
+        }
+        file_server
+    }
 }

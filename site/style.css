@@ -136,7 +136,7 @@ details[open] summary:after { content: '−'; }
 .skip { position: absolute; left: 20px; top: -100px; background: var(--ink); color: white; padding: 10px; z-index: 10; }
 .skip:focus { top: 10px; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
-.guide-layout { display: grid; grid-template-columns: 250px minmax(0, 1000px); gap: 80px; padding-block: 80px 110px; justify-content: center; }
+.guide-layout { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 80px; padding-block: 80px 110px; }
 .guide-toc { font-size: 15px; line-height: 1.7; position: sticky; top: 30px; height: max-content; }
 .guide-toc a { display: block; padding: 9px 0; color: var(--muted); }
 .guide-toc strong { font: 12px var(--mono); letter-spacing: 1px; color: var(--accent); display: block; margin-bottom: 20px; }

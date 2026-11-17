@@ -13,33 +13,21 @@ The AI runs on the diagnostician's side. The user does not need to install an AI
 
 ### 1. Prepare both computers
 
-Install Node.js, npm and npx by copying the entire block for your computer. Setup never updates an existing Node.js installation or changes its PATH. It reuses Node.js 20.10+ with working npm/npx. If Node.js is absent, it downloads and verifies official Node.js 22 binaries into your user directory. Older or incomplete installations are left unchanged, with an explanation for your diagnostician. No administrator access is normally needed.
+Run the one-line setup command for your computer. It downloads our open-source installer, reuses existing Node.js without updating it, and installs Node.js/npm/npx only if Node.js is absent. No administrator access is normally needed.
 
 **Windows:** open the Start menu, type **Windows PowerShell**, and open it. Paste:
 
 ```powershell
-[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-$setupScript = [IO.Path]::GetTempFileName()
-try {
-  Invoke-WebRequest -UseBasicParsing 'https://diagnose.fenginwind.com/setup/setup-node.ps1' -OutFile $setupScript
-  & ([scriptblock]::Create((Get-Content -Raw -LiteralPath $setupScript)))
-} finally { Remove-Item -LiteralPath $setupScript }
+curl.exe -fsSL https://diagnose.fenginwind.com/setup/setup-node.ps1 | Out-String | Invoke-Expression
 ```
 
 **Mac:** press **Command + Space**, type **Terminal**, and press Return. **Linux:** open Terminal. Paste:
 
 ```sh
-setup_script="$(mktemp)" &&
-curl -fsSL --proto '=https' --proto-redir '=https' https://diagnose.fenginwind.com/setup/setup-node.sh -o "$setup_script" &&
-if command -v node >/dev/null 2>&1; then
-  bash "$setup_script"
-else
-  bash "$setup_script" && . "$HOME/.diagnose/node/env"
-fi &&
-rm -f "$setup_script"
+curl -fsSL https://diagnose.fenginwind.com/setup/setup-node.sh | bash
 ```
 
-Wait for **Setup complete** and three version numbers. Keep this window open for the next command. On Windows, use `npx.cmd` and `npm.cmd` wherever this guide says `npx` and `npm`; this avoids PowerShell script-policy errors without changing your security settings. See [setup details and troubleshooting](#first-time-setup-install-nodejs-and-npm) if setup fails.
+Wait for **Setup complete** and three version numbers. Then close the terminal and open a fresh one before continuing, so a newly installed Node.js is available. On Windows, close all terminal windows and reopen Windows PowerShell from the Start menu. On Windows, use `npx.cmd` and `npm.cmd` wherever this guide says `npx` and `npm`; this avoids PowerShell script-policy errors without changing your security settings. See [setup details and troubleshooting](#first-time-setup-install-nodejs-and-npm) if setup fails.
 
 Only the **diagnostician** needs an installed, signed-in Codex CLI, Claude Code, or Gemini CLI. The person receiving help needs no AI account.
 
@@ -118,32 +106,20 @@ If you are the person receiving help, this is the only software setup you need. 
 Open the **Start** menu, type **Windows PowerShell**, and open it normally. Copy the complete block below, paste it into that window, and press Enter:
 
 ```powershell
-[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-$setupScript = [IO.Path]::GetTempFileName()
-try {
-  Invoke-WebRequest -UseBasicParsing 'https://diagnose.fenginwind.com/setup/setup-node.ps1' -OutFile $setupScript
-  & ([scriptblock]::Create((Get-Content -Raw -LiteralPath $setupScript)))
-} finally { Remove-Item -LiteralPath $setupScript }
+curl.exe -fsSL https://diagnose.fenginwind.com/setup/setup-node.ps1 | Out-String | Invoke-Expression
 ```
 
-The script detects x64 or ARM64 automatically, checks Node.js/npm/npx, and installs into your user profile only if Node.js is absent. An existing version is never upgraded or replaced. Wait for **Setup complete**. Use `npx.cmd @masstensor/diagnose@latest start` in the same window. No execution-policy change or administrator terminal is required. Windows support remains experimental; this installer has not yet had Windows hardware validation.
+The script detects x64 or ARM64 automatically, checks Node.js/npm/npx, and installs into your user profile only if Node.js is absent. An existing version is never upgraded or replaced. Wait for **Setup complete**, close all terminal windows, and open Windows PowerShell again from the Start menu. Then run `npx.cmd @masstensor/diagnose@latest start`. No execution-policy change or administrator terminal is required. Windows support remains experimental; this installer has not yet had Windows hardware validation.
 
 ### Mac or Linux: copy and paste setup
 
 On a Mac, press **Command + Space**, type **Terminal**, and press Return. On Linux, open Terminal. Copy the entire block, paste it, and press Return:
 
 ```sh
-setup_script="$(mktemp)" &&
-curl -fsSL --proto '=https' --proto-redir '=https' https://diagnose.fenginwind.com/setup/setup-node.sh -o "$setup_script" &&
-if command -v node >/dev/null 2>&1; then
-  bash "$setup_script"
-else
-  bash "$setup_script" && . "$HOME/.diagnose/node/env"
-fi &&
-rm -f "$setup_script"
+curl -fsSL https://diagnose.fenginwind.com/setup/setup-node.sh | bash
 ```
 
-Wait for **Setup complete**, then run `npx @masstensor/diagnose@latest start` in the same window. If Node.js is absent, the script selects Intel/x64 or ARM64 automatically. It needs curl, tar, and a SHA-256 utility, which are included on macOS and common Linux desktop distributions. Linux requires a compatible official Node.js binary; minimal, musl-based or older distributions may need help from the diagnostician.
+Wait for **Setup complete**, then close Terminal and open it again to load the new PATH. Run `npx @masstensor/diagnose@latest start` in the new window. If Node.js is absent, the script selects Intel/x64 or ARM64 automatically. It needs curl, tar, and a SHA-256 utility, which are included on macOS and common Linux desktop distributions. Linux requires a compatible official Node.js binary; minimal, musl-based or older distributions may need help from the diagnostician.
 
 ### What setup changes
 

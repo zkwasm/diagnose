@@ -93,7 +93,7 @@ For an AI session, the diagnostician must separately install and sign in to Code
 
 Node.js 20.10+ runtime compatibility is available in Diagnose 0.5.0+. Earlier Diagnose packages declare Node.js 22.18+; use a compatible Diagnose version rather than automatically upgrading the user's Node.js. The relay deployment wrapper requires Node.js 22+ separately.
 
-Use the latest package on both endpoints. Session agent launchers require 0.3.1 or later; live resource features require 0.3 or later. macOS probes and the Linux relay have been tested. Linux and Windows probes, including Windows ConPTY and interactive authentication, remain experimental.
+Use the latest package on both endpoints. Session agent launchers require 0.3.1 or later; live resource features require 0.3 or later. macOS probes and the Linux relay have been tested. Automated CI runs the full suite on macOS/Linux and targeted history, transfer-conflict, long-session, encryption, and npm-launcher tests on Windows. Windows ConPTY, interactive authentication, and physical USB/serial behavior still need real-environment validation.
 
 ## First-time setup: install Node.js and npm
 

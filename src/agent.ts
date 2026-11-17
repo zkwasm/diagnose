@@ -27,10 +27,11 @@ export async function launchAgent(argv: string[]): Promise<number> {
   const server = { command: process.execPath, args: [fileURLToPath(new URL('./cli.js', import.meta.url)), 'mcp', ...(values.relay ? [values.relay] : [])] };
   const env = { ...process.env }; let directory: string | undefined;
   try {
-    let prompt: string | undefined;
+    let prompt: string | undefined, taskDirectory: string | undefined;
     if (skill) {
       directory = await mkdtemp(join(tmpdir(), 'diagnose-agent-'));
-      const snapshot = join(directory, 'task.json');
+      taskDirectory = join(directory, 'task'); await mkdir(taskDirectory, { mode: 0o700 });
+      const snapshot = join(taskDirectory, 'task.json');
       await writeFile(snapshot, JSON.stringify(skill), { mode: 0o600 });
       prompt = skillPrompt(snapshot);
       console.error('Starting the selected skill. Its instructions and referenced data may be sent to your chosen AI provider. Remote pairing and existing permissions still apply.');
@@ -55,7 +56,7 @@ export async function launchAgent(argv: string[]): Promise<number> {
       await writeFile(path, JSON.stringify({ ...settings, mcpServers: { ...(settings.mcpServers as object ?? {}), diagnose: server } }), { mode: 0o600 });
       env.GEMINI_CLI_HOME = directory; args = extra;
     }
-    if (prompt) args = agent === 'gemini' ? [...args, '--prompt-interactive', prompt] : [...args, '--', prompt];
+    if (prompt) args = agent === 'gemini' ? [...args, '--include-directories', taskDirectory!, '--prompt-interactive', prompt] : [...args, '--add-dir', taskDirectory!, '--', prompt];
     return await new Promise<number>((resolveExit, reject) => {
       const child = spawn(agent, args, { env, stdio: 'inherit', shell: false });
       const interrupt = () => { child.kill('SIGINT'); }, terminate = () => { child.kill('SIGTERM'); };

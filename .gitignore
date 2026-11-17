@@ -1,0 +1,8 @@
+node_modules/
+dist/
+*.tgz
+.env
+.env.*
+logs/
+.DS_Store
+test/live-*.ts

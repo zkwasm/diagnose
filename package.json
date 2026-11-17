@@ -1,0 +1,58 @@
+{
+  "name": "@masstensor/diagnose",
+  "version": "0.3.1",
+  "description": "End-to-end encrypted, user-approved remote diagnostics over a blind relay",
+  "type": "module",
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "engines": {
+    "node": ">=22.18.0"
+  },
+  "bin": {
+    "diagnose": "dist/cli.js",
+    "diagnose-relay": "dist/relay-main.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "npm-shrinkwrap.json",
+    "src",
+    "tsconfig.json",
+    "test/*.test.ts",
+    "test/noise-vector.json",
+    "deploy",
+    "test/CACOPHONY-LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "check": "tsc --noEmit",
+    "test": "npm run build && node --experimental-strip-types --test --test-concurrency=1 test/*.test.ts",
+    "prepack": "npm run build",
+    "postinstall": "node --input-type=module -e \"import { existsSync } from 'node:fs'; if (existsSync('dist/prepare-pty.js')) await (await import('./dist/prepare-pty.js')).preparePty();\""
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.2",
+    "node-pty": "1.1.0",
+    "noise-handshake": "4.2.1",
+    "serialport": "13.0.0",
+    "ws": "8.23.0",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.5",
+    "@types/ws": "8.18.1",
+    "typescript": "7.0.2"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zkwasm/diagnose.git"
+  },
+  "homepage": "https://github.com/zkwasm/diagnose#readme",
+  "bugs": {
+    "url": "https://github.com/zkwasm/diagnose/issues"
+  }
+}

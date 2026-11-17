@@ -1,0 +1,15 @@
+<!-- Read-only evaluation against this installed version's src, README and tests.
+     Pair an explicit-consent fixture host rooted at this package; use file.list/read,
+     diagnose_start and diagnose_wait. No process execution or device access required. -->
+<evaluation>
+  <qa_pair><question>Inspect schema.ts and resources.ts. What is the maximum number of active live resource handles?</question><answer>128</answer></qa_pair>
+  <qa_pair><question>Inspect schema.ts and resources.ts. Which operation restores an existing handle without executing its original command?</question><answer>resource.resume</answer></qa_pair>
+  <qa_pair><question>Inspect transfers.ts and resources.ts. What checksum algorithm must match before a transferred file replaces its destination?</question><answer>SHA-256</answer></qa_pair>
+  <qa_pair><question>Inspect forward.ts and schema.ts. Which SOCKS protocol version supports dynamic TCP forwarding?</question><answer>5</answer></qa_pair>
+  <qa_pair><question>Inspect resources.ts and journal.ts. Which authenticated cipher protects local resource records?</question><answer>AES-256-GCM</answer></qa_pair>
+  <qa_pair><question>Inspect schema.ts and resources.ts. What is the default per-process retained output limit, in bytes?</question><answer>67108864</answer></qa_pair>
+  <qa_pair><question>Inspect cli.ts and README.md. What local command rotates the recovery credential of an existing resource?</question><answer>recover</answer></qa_pair>
+  <qa_pair><question>Inspect executor.ts and schema.ts. Does file.rename overwrite an existing destination by default?</question><answer>no</answer></qa_pair>
+  <qa_pair><question>Inspect mcp.ts and schema.ts. Which MCP tool transfers files without passing base64 contents through AI context?</question><answer>diagnose_transfer</answer></qa_pair>
+  <qa_pair><question>Inspect resources.ts and README.md. After the original host process has disappeared, can recovery automatically reexecute a saved command?</question><answer>no</answer></qa_pair>
+</evaluation>

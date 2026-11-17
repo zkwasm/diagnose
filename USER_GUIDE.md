@@ -19,7 +19,11 @@ Install Node.js, npm and npx by copying the entire block for your computer. Setu
 
 ```powershell
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-& ([scriptblock]::Create((Invoke-WebRequest -UseBasicParsing 'https://diagnose.fenginwind.com/setup/setup-node.ps1').Content))
+$setupScript = [IO.Path]::GetTempFileName()
+try {
+  Invoke-WebRequest -UseBasicParsing 'https://diagnose.fenginwind.com/setup/setup-node.ps1' -OutFile $setupScript
+  & ([scriptblock]::Create((Get-Content -Raw -LiteralPath $setupScript)))
+} finally { Remove-Item -LiteralPath $setupScript }
 ```
 
 **Mac:** press **Command + Space**, type **Terminal**, and press Return. **Linux:** open Terminal. Paste:
@@ -115,7 +119,11 @@ Open the **Start** menu, type **Windows PowerShell**, and open it normally. Copy
 
 ```powershell
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-& ([scriptblock]::Create((Invoke-WebRequest -UseBasicParsing 'https://diagnose.fenginwind.com/setup/setup-node.ps1').Content))
+$setupScript = [IO.Path]::GetTempFileName()
+try {
+  Invoke-WebRequest -UseBasicParsing 'https://diagnose.fenginwind.com/setup/setup-node.ps1' -OutFile $setupScript
+  & ([scriptblock]::Create((Get-Content -Raw -LiteralPath $setupScript)))
+} finally { Remove-Item -LiteralPath $setupScript }
 ```
 
 The script detects x64 or ARM64 automatically, checks Node.js/npm/npx, and installs into your user profile only if Node.js is absent. An existing version is never upgraded or replaced. Wait for **Setup complete**. Use `npx.cmd @masstensor/diagnose@latest start` in the same window. No execution-policy change or administrator terminal is required. Windows support remains experimental; this installer has not yet had Windows hardware validation.

@@ -7,7 +7,7 @@ import { createHash } from 'node:crypto';
 import { loadSkill } from '../dist/skill.js';
 
 test('skill loader accepts UTF-8 Markdown and preserves exact instructions and source base', async () => {
-  const root = await realpath(await mkdtemp(join(tmpdir(), 'diagnose skill '))), file = join(root, 'device "quoted".md'), source = '\uFEFF# Device\nCheck port 11500. Literal $(do-not-execute).\n';
+  const root = await realpath(await mkdtemp(join(tmpdir(), 'diagnose skill '))), file = join(root, process.platform === 'win32' ? 'device with spaces.md' : 'device "quoted".md'), source = '\uFEFF# Device\nCheck port 11500. Literal $(do-not-execute).\n';
   await writeFile(file, source); const skill = await loadSkill(file);
   assert.equal(skill.sourceFile, file); assert.equal(skill.baseDirectory, root); assert.equal(skill.instructions, source.slice(1)); assert.equal(skill.sha256, createHash('sha256').update(Buffer.from(source)).digest('hex'));
 });

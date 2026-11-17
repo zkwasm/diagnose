@@ -116,7 +116,12 @@ export class SkillLibrary {
       }
       if (digest(await readBundle(temporary)) !== revision) throw new Error('Skill changed during import');
       try { await rename(temporary, destination); }
-      catch (error) { if (!['EEXIST', 'ENOTEMPTY'].includes((error as NodeJS.ErrnoException).code ?? '')) throw error; }
+      catch (error) {
+        // Windows reports EPERM when another import already published this
+        // nonempty directory. Accept only a fully verified existing revision,
+        // never an error code alone (which could also mean real permission loss).
+        try { await this.load(reference); } catch { throw error; }
+      }
       await this.load(reference);
       return reference;
     } finally { await rm(temporary, { recursive: true, force: true }); }

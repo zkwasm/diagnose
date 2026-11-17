@@ -7,7 +7,7 @@ for (const file of pages) {
   const html = await readFile(join(root, file), 'utf8'); const ids = [...html.matchAll(/\bid="([^"]+)"/g)].map(match => match[1]); assert.equal(new Set(ids).size, ids.length, `Duplicate IDs in ${file}`); assert.match(html, /<html lang="en">/); assert.doesNotMatch(html, /\p{Script=Han}/u);
   for (const [, link] of html.matchAll(/(?:href|src|poster)="([^"]+)"/g)) {
     if (/^(https?:|mailto:)/.test(link)) continue;
-    const [path, anchor] = link.split('#'); let target = path.startsWith('/') ? path.slice(1) : path ? path : file;
+    const [resource, anchor] = link.split('#'), path = resource.split('?')[0]; let target = path.startsWith('/') ? path.slice(1) : path ? path : file;
     if (!target || target.endsWith('/')) target += 'index.html';
     await access(join(root, target));
     if (anchor) assert.ok((await readFile(join(root, target), 'utf8')).includes(`id="${anchor}"`), `Missing anchor ${link} in ${file}`);

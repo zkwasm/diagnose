@@ -3,12 +3,6 @@ import { readFile, access } from 'node:fs/promises';
 import { join } from 'node:path';
 import vm from 'node:vm';
 const root = '.site-dist', pages = ['index.html', 'guide/index.html'];
-const home = await readFile(join(root, 'index.html'), 'utf8');
-assert.match(home, /id="quick-start"/);
-assert.ok(home.includes('On the computer receiving help') && home.includes("On the diagnostician&#39;s computer"));
-assert.ok(home.includes('setup-node.ps1') && home.includes('setup-node.sh'));
-assert.ok(home.includes('&#10;'), 'Multiline setup commands must preserve copyable line breaks');
-assert.ok(!home.includes('<!-- QUICK_START_CONTENT -->'));
 for (const file of pages) {
   const html = await readFile(join(root, file), 'utf8'); const ids = [...html.matchAll(/\bid="([^"]+)"/g)].map(match => match[1]); assert.equal(new Set(ids).size, ids.length, `Duplicate IDs in ${file}`); assert.match(html, /<html lang="en">/); assert.doesNotMatch(html, /\p{Script=Han}/u);
   for (const [, link] of html.matchAll(/(?:href|src|poster)="([^"]+)"/g)) {

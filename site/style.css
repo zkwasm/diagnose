@@ -278,9 +278,3 @@ details[open] summary:after { content: '−'; }
   * { transition: none !important; }
 }
 
-.homepage-quick-start { border-block: 1px solid var(--line); }
-.quick-start-intro { font-size: 22px; color: var(--muted); margin: 24px 0 42px; }
-.quick-command { position: relative; }
-.quick-command pre { padding-top: 54px; }
-.quick-command .copy { position: absolute; top: 10px; right: 12px; border: 1px solid var(--line); border-radius: 4px; padding: 5px 12px; background: var(--paper); color: var(--ink); font-size: 14px; }
-.quick-command .copy:hover { background: #f9fcff; }

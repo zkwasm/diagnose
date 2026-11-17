@@ -17,6 +17,78 @@ For an AI session, the diagnostician must separately install and sign in to Code
 
 Use the latest package on both endpoints. Session agent launchers require 0.3.1 or later; live resource features require 0.3 or later. macOS probes and the Linux relay have been tested. Linux and Windows probes, including Windows ConPTY and Gemini symlink permissions, remain experimental.
 
+## First-time setup: install Node.js and npm
+
+If you are the person receiving help, this is the only software setup you need. You do **not** need a Codex, Claude, Gemini, or npm account. Your diagnostician runs the AI on their own computer.
+
+**Node.js** runs Diagnose. **npm** downloads it. **npx** starts it without requiring a separate global installation. The official Node.js installer includes npm and npx; do not download them from separate websites.
+
+If Node.js is already installed, go straight to [Check the installation](#check-the-installation). Otherwise, follow the instructions for your computer below. The installer may ask for your computer's normal administrator approval. Enter any OS password only in your computer's own prompt, not in a chat or the diagnostic session.
+
+### Windows
+
+1. Open [the official Node.js download page](https://nodejs.org/en/download) in your web browser.
+2. Select **Node.js 22 LTS**, version **22.18 or later**, in the version selector. This is the major version used for Diagnose's existing validation. Select **Windows** and download the **Windows Installer (.msi)**, rather than a ZIP archive or source code. The page's first selected version may be a different major release.
+3. Use **x64** for most Intel/AMD PCs. For an ARM-based PC, use **ARM64**. If unsure, check **Settings → System → About → System type** or ask the person helping you.
+4. Open the downloaded `.msi` file and follow the installer. Keep the default features, including **npm package manager** and **Add to PATH**. You do not need to select optional extra development tools just to follow this guide.
+5. Close any command or terminal windows that were open before installation.
+6. Open the **Start** menu, type **Command Prompt** or **cmd**, and open it. This is the window where you will paste the commands below; you do not need to run it as administrator.
+
+The Windows probe is still experimental. If a feature or device driver does not work, keep the error message and ask your diagnostician for help.
+
+### Mac
+
+1. Open [the official Node.js download page](https://nodejs.org/en/download) in Safari or another web browser.
+2. Select **Node.js 22 LTS**, version **22.18 or later**, in the version selector. Select **macOS** and download the **macOS Installer (.pkg)**, rather than a compressed archive or source code.
+3. If asked for a processor type, choose **ARM64** for Apple silicon (M1, M2, M3, or later) or **x64** for an Intel Mac. Check **Apple menu → About This Mac** if you are unsure.
+4. Open the downloaded `.pkg` file and follow the installer, keeping its default features.
+5. Close terminal windows that were open before installation.
+6. Press **Command + Space**, type **Terminal**, and press **Return**. Paste the commands below into this Terminal window.
+
+You do not need Homebrew, a version manager, or a developer account for this installer-based route.
+
+### Linux or a managed work computer
+
+For Linux, follow the [official Node.js installation instructions](https://nodejs.org/en/download) for your distribution and ensure the installed version is **22.18 or later**. Distribution package repositories can contain older versions. Linux probes remain experimental.
+
+If a work or school computer does not allow software installation, ask your IT administrator or diagnostician for help. Do not change security policies to get around the restriction.
+
+### Check the installation
+
+In Command Prompt on Windows, or Terminal on a Mac, paste **one line at a time** and press Enter/Return after each:
+
+```sh
+node --version
+npm --version
+npx --version
+```
+
+Each command should print a version number. The Node.js number begins with `v` and must be **22.18.0 or later**. npm and npx have their own version numbers; they do not need to match Node.js. If your installed Node.js already meets the requirement, you do not need to reinstall it.
+
+You are now ready. Paste this single command into the same window and press Enter/Return:
+
+```sh
+npx @masstensor/diagnose@latest start
+```
+
+The first run downloads Diagnose and may take a little time. If npm asks whether to install `@masstensor/diagnose`, type `y` and press Enter. You do not need to run `npm login` or create an npm account. When the pairing code appears, installation is complete: keep the window open and send the code privately to your diagnostician. Continue with [Start on the user's computer](#2-start-on-the-users-computer) for the connection and approval details.
+
+Copy only the command, not a leading dollar-sign prompt, the surrounding code-box marks, or example output. On a Mac, stopping the probe is **Control + C**, not Command + C.
+
+### If something goes wrong
+
+| What you see | What to do |
+| --- | --- |
+| “node is not recognized” or “command not found” | Close and reopen Command Prompt/Terminal, then try again. If it still fails, run the official installer again with the default PATH option, or ask your diagnostician for help. |
+| An older Node.js version | Install Node.js 22 LTS at version 22.18 or later, reopen the terminal, and repeat the three version checks. |
+| npm or npx is missing | Re-run the official Node.js installer with npm selected. npm and npx should come with it. |
+| PowerShell says `npm.ps1` or `npx.ps1` cannot run because scripts are disabled | Open **Command Prompt (cmd)** and run the same commands there. You do not need to change PowerShell's execution policy. |
+| “EACCES”, “EPERM”, or “permission denied” during a global install | Use the `npx … start` command above instead of `npm install -g`. If that also fails, share the error with your diagnostician; do not add `sudo` or change folder permissions at random. |
+| A download, certificate, or network error | Check your internet connection and ask your diagnostician or IT administrator for help. Do not disable certificate checks or your firewall. |
+| A build/driver error, or the device is not listed | Share the error with the diagnostician. Node.js installation does not install every device's USB or serial driver. |
+
+Official references: [Node.js downloads](https://nodejs.org/en/download) and [npm's Node.js/npm installation guide](https://docs.npmjs.com/downloading-and-installing-node-js-and-npm/).
+
 ## 2. Start on the user's computer
 
 ```sh

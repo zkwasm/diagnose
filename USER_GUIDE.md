@@ -318,7 +318,7 @@ diagnose agent codex --device workshop-laptop --case CASE_ID
 
 Replace `CASE_ID` with the printed UUID. Use `claude` or `gemini` in the same command. Include a `skill` field containing a complete `library:NAME@REVISION` reference to pin a procedure; the launcher loads it automatically. A different explicit skill or paired computer is rejected. Reusing a case does not replay old commands; existing remembered-pairing rules apply. Check device availability again after reconnecting.
 
-For Markdown startup tasks, the agent is instructed to create a case before operating. The agent must actually call the tool; launching is not proof that a case was created. Cases are optional for ordinary MCP operations. In a selected case, only results actually received by the diagnostician are recorded.
+For Markdown startup tasks, the agent is instructed to create a case before operating. The agent must actually call the tool; launching is not proof that a case was created. Only one MCP session can write a selected case at a time. After an unclean termination, use `diagnose cases unlock CASE_ID`; it refuses to unlock while the recorded writer process is alive. Cases are optional for ordinary MCP operations. In a selected case, only results actually received by the diagnostician are recorded.
 
 ```sh
 diagnose cases show CASE_ID

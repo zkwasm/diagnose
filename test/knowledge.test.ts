@@ -103,3 +103,10 @@ test('received bundles cannot traverse directories or import a forged content re
   await assert.rejects(library.restore({ reference, files: [{ path: 'SKILL.md', data: Buffer.from('# valid but wrong digest').toString('base64') }] }), /integrity/);
   assert.deepEqual(await library.list(), []);
 });
+
+test('a selected case refuses a second writer and cannot be removed while active', async t => {
+  const root = await fixture(t), first = new Cases(join(root, 'cases')), second = new Cases(join(root, 'cases'));
+  const value = first.create({ goal: 'Inspect device', target: { name: 'Gateway', interface: 'serial' } });
+  const release = first.claim(value.id); assert.throws(() => second.claim(value.id), /writer/); assert.throws(() => second.remove(value.id), /in use/); assert.throws(() => second.unlock(value.id), /still alive/);
+  release(); const releaseSecond = second.claim(value.id); releaseSecond(); second.remove(value.id); assert.deepEqual(first.list(), []);
+});

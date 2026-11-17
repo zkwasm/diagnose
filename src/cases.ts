@@ -1,7 +1,7 @@
 import { randomUUID, createHash } from 'node:crypto';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { unlinkSync } from 'node:fs';
+import { unlinkSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { z } from 'zod';
 import { Journal } from './journal.js';
 import { redact } from './util.js';
@@ -34,7 +34,20 @@ export class Cases {
     this.journal.save({ id: value.id, kind: 'process', state: 'case', createdAt: value.createdAt, updatedAt: '', ownerPid: 0, tokenHash: '', retainOnDisconnect: false, case: value });
   }
   list() { return this.journal.list().map(meta => { const value = meta.case as Case; return { id: value.id, goal: value.goal, target: value.target, createdAt: value.createdAt, outcome: value.conclusion?.outcome ?? 'open', evidenceCount: value.evidence.length }; }); }
-  remove(id: string): void { this.get(id); unlinkSync(join(this.root, id + '.meta')); }
+  remove(id: string): void { this.get(id); if (existsSync(join(this.root, id + '.lock'))) throw new Error('Case is in use; stop its agent before removing it'); unlinkSync(join(this.root, id + '.meta')); }
+  claim(id: string): () => void {
+    this.get(id); const path = join(this.root, id + '.lock'), token = randomUUID();
+    try { writeFileSync(path, JSON.stringify({ pid: process.pid, token }), { flag: 'wx', mode: 0o600 }); }
+    catch (error) { if ((error as NodeJS.ErrnoException).code === 'EEXIST') throw new Error('Case already has a writer. Stop its agent, or use diagnose cases unlock ID after an unclean exit.'); throw error; }
+    return () => { try { if (JSON.parse(readFileSync(path, 'utf8')).token === token) unlinkSync(path); } catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; } };
+  }
+  unlock(id: string): void {
+    this.get(id); const path = join(this.root, id + '.lock'), lock = JSON.parse(readFileSync(path, 'utf8'));
+    if (!Number.isSafeInteger(lock.pid) || lock.pid <= 0) throw new Error('Invalid case lock; inspect locally');
+    let alive = true; try { process.kill(lock.pid, 0); } catch (error) { if ((error as NodeJS.ErrnoException).code === 'ESRCH') alive = false; }
+    if (alive) throw new Error('Case writer is still alive; stop the agent first');
+    unlinkSync(path);
+  }
   record(id: string, kind: string, data: unknown, taskId?: string): Evidence | undefined {
     const value = this.get(id);
     if (value.evidence.length >= 200) { value.recordingLimited = true; this.save(value); return undefined; }

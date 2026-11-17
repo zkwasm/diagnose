@@ -55,7 +55,8 @@ export async function serveMcp(relay: string, device?: string, caseId?: string):
   });
   server.registerTool('diagnose_disconnect', { description: 'End this diagnostic connection. Remembered pairing remains until revoked on the user computer.', inputSchema: {} }, async () => { remembered?.close(); remembered = undefined; operator?.peer.close(); operator = undefined; return answer({ disconnected: true }); });
   let stopped = false;
-  const stop = () => { if (stopped) return; stopped = true; for (const transfer of transfers.values()) transfer.controller.abort(); for (const value of forwards.values()) void value.close(); remembered?.close(); operator?.peer.close(); void server.close(); };
+  const stop = () => { if (stopped) return; stopped = true; for (const transfer of transfers.values()) transfer.controller.abort(); for (const value of forwards.values()) void value.close(); remembered?.close(); operator?.peer.close(); knowledge.close(); void server.close(); };
+  process.once('exit', () => knowledge.close());
   process.once('SIGINT', stop); process.once('SIGTERM', stop);
   process.stdin.once('end', stop);
   await server.connect(new StdioServerTransport());

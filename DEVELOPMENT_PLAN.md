@@ -58,6 +58,8 @@ Ship each completed milestone with English CLI help, guide examples and tests. M
 - Node.js 20.10: 30 knowledge, library, MCP and launcher checks passed.
 - Physical user-identified OWON SEG-X3-C: two authorized read-only serial captures received 20,293 and 18,992 bytes. Encrypted local case and a pending reviewed draft were produced; no serial command or raw-log publication occurred. This verifies log transport, not device health.
 - English guide, landing page, CLI help and security/operations document updated. Site link, anchor and interaction checks pass.
-- AWS, GitHub CI and npm publication: final release verification pending.
+- AWS relay and website deployed. Two isolated clients completed an HTTPS encrypted-library roundtrip and revoked the synthetic library. Existing Noise diagnostic sessions were also verified through the public relay.
+- Windows/macOS/Linux CI passed after fixing Windows concurrent-directory publication and a nonportable test filename. Final single-writer case protection passed 28 local tests and is included in the next CI run.
+- npm publication awaits official account verification.
 
 The first release deliberately retains explicit pinned revisions, a personal capability-based library, human draft review, and agent-assessed device status. Team roles/public catalogs, automatic rollback, native agent skill installation, proof of inventory freshness, and an independent security audit are outside this plan.

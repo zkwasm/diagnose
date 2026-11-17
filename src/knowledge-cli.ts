@@ -8,7 +8,7 @@ import { Vault } from './vault.js';
 import { safeText } from './util.js';
 import { SkillLibrary } from './skill-library.js';
 
-export const knowledgeUsage = `diagnose cases create INPUT.json | list | show ID | export ID | remove ID
+export const knowledgeUsage = `diagnose cases create INPUT.json | list | show ID | export ID | remove ID | unlock ID
 diagnose drafts create INPUT.json | list | show ID | review ID | accept ID | reject ID | remove ID
 diagnose vault init BACKUP_FILE | restore BACKUP_FILE | backup NEW_FILE
 diagnose vault status | push library:NAME@REVISION | pull | revoke | forget [--relay URL]`;
@@ -29,6 +29,7 @@ export async function knowledgeCommand(command: string, argv: string[]): Promise
     if (action === 'create' && argument) { const input = caseInputSchema.parse(await json(argument)); if (input.skill) await new SkillLibrary().load(input.skill); print(cases.create(input)); return; }
     if (action === 'show' && argument) { print(cases.get(argument)); return; }
     if (action === 'export' && argument) { print(cases.report(argument)); return; }
+    if (action === 'unlock' && argument) { if (await confirm('Release the lock left by a terminated case writer?')) cases.unlock(argument); return; }
     if (action === 'remove' && argument) { if (await confirm('Delete this local case and its retained evidence?')) cases.remove(argument); return; }
   }
   if (command === 'drafts') {

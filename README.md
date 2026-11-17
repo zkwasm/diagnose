@@ -100,7 +100,7 @@ No device-specific integration is required in the probe. An approved script can 
 - Approved processes have the current OS user's permissions. **Diagnose is not a sandbox.** It does not automatically elevate privileges or install a background service.
 - Finite text results receive best-effort credential redaction. Live terminals, exact file transfers, and TCP traffic are raw and **not redacted**.
 - Results are visible to the diagnostician and the AI provider they use. End-to-end encryption does not hide data from those recipients.
-- Local audit logs record decisions, targets, hashes, byte counts, and outcomes. They do not reconstruct every side effect of an arbitrary program. Changes are not automatically rolled back.
+- Local audit logs record decisions, targets, hashes, byte counts, and outcomes. Encrypted history keeps exact task requests, finite collected results, approvals, and send events: use `diagnose history`, `diagnose show ID`, and `diagnose cleanup --days 0`. History and resource journals each have a 256 MiB / 2,000-record budget and seven-day inactive retention. They do not reconstruct every side effect of an arbitrary program. Changes are not automatically rolled back.
 - `permissions ask`, `cancel`, and `Ctrl+C` are local controls. Data already transmitted cannot be recalled.
 
 Read the [user guide](USER_GUIDE.md#security-and-local-data) before operating a session. The protocol has not received an independent security audit.

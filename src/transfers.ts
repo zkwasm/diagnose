@@ -1,4 +1,4 @@
-import { open, stat, rename, writeFile, readFile, unlink } from 'node:fs/promises';
+import { open, stat, lstat, rename, writeFile, readFile, unlink, link, chmod } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { resolve } from 'node:path';
 import type { Operator } from './operator.js';
@@ -6,6 +6,10 @@ export type TransferProgress = { state: string; bytes: number; size: number; res
 export type TransferOptions = { resumeId?: string; resumeToken?: string; overwrite?: boolean; signal?: AbortSignal; progress?: (progress: TransferProgress) => void };
 type Descriptor = { id: string; resumeToken?: string; size: number; sha256: string; offset: number };
 async function hash(path: string): Promise<string> { const file = await open(path, 'r'); try { const value = createHash('sha256'); for await (const bytes of file.createReadStream({ autoClose: false })) value.update(bytes); return value.digest('hex'); } finally { await file.close(); } }
+async function snapshot(path: string): Promise<{ sha256: string; mode: number } | null> {
+  try { const info = await lstat(path); if (!info.isFile() || info.isSymbolicLink()) throw new Error('Local target must be a regular non-symlink file'); return { sha256: await hash(path), mode: info.mode & 0o777 }; }
+  catch (error) { if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null; throw error; }
+}
 async function grant(operator: Operator, input: Parameters<Operator['run']>[0], options: TransferOptions): Promise<Descriptor> {
   options.signal?.throwIfAborted(); const id = await operator.start(options.resumeId ? { operation: 'resource.resume', arguments: { id: options.resumeId, resumeToken: options.resumeToken }, reason: input.reason } : input);
   const abort = () => { void operator.cancel(id).catch(() => {}); }; options.signal?.addEventListener('abort', abort, { once: true });
@@ -26,7 +30,8 @@ export async function upload(operator: Operator, localPath: string, remotePath: 
 }
 export async function download(operator: Operator, remotePath: string, localPath: string, reason: string, options: TransferOptions = {}): Promise<TransferProgress> {
   const destination = resolve(localPath), partial = destination + '.diagnose.part', sidecar = destination + '.diagnose.json';
-  try { await stat(destination); if (!options.overwrite) throw new Error('Local target exists; explicit overwrite is required'); } catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; }
+  const before = await snapshot(destination);
+  if (before && !options.overwrite) throw new Error('Local target exists; explicit overwrite is required');
   let saved: { resourceId: string; resumeToken: string; sha256: string } | undefined;
   try { saved = JSON.parse(await readFile(sidecar, 'utf8')); } catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; }
   const effective = options.resumeId ? options : saved ? { ...options, resumeId: saved.resourceId, resumeToken: saved.resumeToken } : options;
@@ -44,5 +49,11 @@ export async function download(operator: Operator, remotePath: string, localPath
     await file.sync();
   } finally { await file.close(); }
   if (progress.bytes !== resource.size || await hash(partial) !== resource.sha256) throw new Error('Download integrity mismatch; destination untouched');
-  options.signal?.throwIfAborted(); await rename(partial, destination); await unlink(sidecar); await operator.resource({ id: resource.id, action: 'close' }); progress.state = 'completed'; options.progress?.({ ...progress }); return progress;
+  options.signal?.throwIfAborted();
+  if (before === null) { await link(partial, destination); await unlink(partial); }
+  else {
+    if (JSON.stringify(await snapshot(destination)) !== JSON.stringify(before)) throw new Error('Local destination changed during download; destination untouched');
+    await chmod(partial, before.mode); options.signal?.throwIfAborted(); await rename(partial, destination);
+  }
+  await unlink(sidecar); await operator.resource({ id: resource.id, action: 'close' }); progress.state = 'completed'; options.progress?.({ ...progress }); return progress;
 }

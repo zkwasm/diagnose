@@ -1,10 +1,10 @@
 import { spawn as spawnProcess } from 'node:child_process';
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import { constants } from 'node:fs';
-import { open, lstat, realpath, rename, unlink } from 'node:fs/promises';
+import { open, lstat, realpath, rename, unlink, link } from 'node:fs/promises';
 import { dirname, resolve, join, basename } from 'node:path';
 import net from 'node:net';
-import { Journal, type ResourceMeta } from './journal.js';
+import { Journal, retention, type ResourceMeta } from './journal.js';
 import { killTree } from './executor.js';
 import { Audit, sha256 } from './util.js';
 import type { AtomicTask, ResourceRequest } from './schema.js';
@@ -21,9 +21,12 @@ export class SessionResources {
   readonly journal: Journal;
   private resources = new Map<string, Resource>();
   private writes = new Map<string, Promise<unknown>>();
-  constructor(root: string, private audit: Audit) { this.journal = new Journal(root); }
+  constructor(root: string, private audit: Audit) { this.journal = new Journal(root, retention); }
   setAudit(audit: Audit): void { this.audit = audit; }
   private create(id: string, kind: ResourceMeta['kind'], owner: string, retainOnDisconnect: boolean, details: Record<string, unknown> = {}): { resource: Resource; token: string } {
+    for (const [key, value] of this.resources) {
+      if (!['running', 'open', 'listening'].includes(value.meta.state) && (!this.journal.exists(key) || this.resources.size >= 256)) this.resources.delete(key);
+    }
     if (this.resources.has(id) || this.journal.exists(id)) throw new Error('Resource ID already exists. Resume it; do not replay its creation.');
     if ([...this.resources.values()].filter(r => ['running', 'open', 'listening'].includes(r.meta.state)).length >= 128) throw new Error('Active resource limit reached; close unused resources');
     const token = randomBytes(32).toString('base64url'), now = new Date().toISOString();
@@ -72,7 +75,9 @@ export class SessionResources {
     if (request.action === 'input') {
       if (!resource.input) throw new Error('This resource does not accept input'); const bytes = Buffer.from(request.data ?? '', 'base64');
       if (bytes.length > 65536 || bytes.toString('base64') !== (request.data ?? '')) throw new Error('Invalid input encoding');
-      this.audit.record('resource.input', { id: meta.id, bytes: bytes.length, eof: request.eof }); await resource.input(bytes, request.eof); return { acceptedBytes: bytes.length };
+      this.audit.record('resource.input', { id: meta.id, bytes: bytes.length, eof: request.eof });
+      if (meta.kind === 'process') this.audit.history.event(meta.id, 'process-input', { encoding: 'base64', data: bytes.toString('base64'), eof: request.eof });
+      await resource.input(bytes, request.eof); return { acceptedBytes: bytes.length };
     }
     if (request.action === 'resize') { if (!resource.resize || !request.cols || !request.rows) throw new Error('Resize requires a PTY and dimensions'); this.audit.record('resource.resize', { id: meta.id, cols: request.cols, rows: request.rows }); resource.resize(request.cols, request.rows); return publicMeta(meta); }
     if (request.action === 'signal') { if (!resource.signal) throw new Error('Not a running process'); const signal = request.signal ?? 'SIGINT'; this.audit.record('resource.signal', { id: meta.id, signal }); resource.signal(signal); return { signalled: true }; }
@@ -84,8 +89,10 @@ export class SessionResources {
     const args = task.arguments, executable = args.executable ?? (process.platform === 'win32' ? process.env.ComSpec ?? 'cmd.exe' : process.env.SHELL ?? '/bin/sh');
     const { resource, token } = this.create(task.id, 'process', owner, args.retainOnDisconnect, { state: 'running', executable, cwd: resolve(args.cwd ?? process.cwd()), pty: args.pty, cols: args.cols, rows: args.rows, bytes: 0 });
     const { meta } = resource; const env = { ...process.env, ...args.env }; for (const key of Object.keys(env)) if (/^(?:DIAGNOSE_|OWON_|NPM_TOKEN|NODE_AUTH_TOKEN)/i.test(key)) delete env[key];
-    let timer: NodeJS.Timeout | undefined, force: NodeJS.Timeout | undefined, closing = false;
-    const ended = (code: number | null, signal?: number | string): void => { clearTimeout(timer); clearTimeout(force); meta.state = 'exited'; meta.exitCode = code; if (signal !== undefined) meta.signal = signal; this.journal.save(meta); this.audit.record('resource.process-exited', { id: meta.id, exitCode: code }); };
+    let timer: NodeJS.Timeout | undefined, closing: Promise<void> | undefined;
+    // A leader exiting does not mean its process group has exited. Clean up
+    // immediately, while the group ID still belongs to this job.
+    const ended = (code: number | null, signal?: number | string): void => { resource.signal?.('SIGKILL'); clearTimeout(timer); meta.state = 'exited'; meta.exitCode = code; if (signal !== undefined) meta.signal = signal; this.journal.save(meta); this.audit.record('resource.process-exited', { id: meta.id, exitCode: code }); };
     const collect = (stream: string, bytes: Buffer): void => {
       try {
         const keep = Math.max(0, Math.min(bytes.length, args.maxOutputBytes - Number(meta.bytes))); if (keep) this.journal.append(meta.id, stream, bytes.subarray(0, keep)); meta.bytes = Number(meta.bytes) + keep;
@@ -99,15 +106,24 @@ export class SessionResources {
         child.onData(value => collect('terminal', Buffer.isBuffer(value) ? value : Buffer.from(value))); child.onExit(value => ended(value.exitCode, value.signal));
         resource.input = async (bytes, eof) => { child.write(bytes.toString('utf8')); if (eof) child.write('\x04'); };
         resource.resize = (cols, rows) => { child.resize(cols, rows); meta.cols = cols; meta.rows = rows; this.journal.save(meta); };
-        resource.signal = signal => { try { child.kill(signal); } catch {} };
+        resource.signal = signal => { try { if (process.platform === 'win32') child.kill(signal); else process.kill(-child.pid, signal as NodeJS.Signals); } catch {} };
       } else {
         const child = spawnProcess(executable, args.args, { cwd: String(meta.cwd), env, detached: process.platform !== 'win32', stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true }); meta.pid = child.pid;
         child.stdout.on('data', bytes => collect('stdout', bytes)); child.stderr.on('data', bytes => collect('stderr', bytes)); child.stdin.on('error', () => {});
-        child.on('error', error => { meta.error = error.message; }); child.on('close', (code, signal) => ended(code, signal ?? undefined));
+        child.on('error', error => { meta.error = error.message; meta.state = 'failed'; this.journal.save(meta); }); child.on('exit', (code, signal) => ended(code, signal ?? undefined));
         resource.input = (bytes, eof) => new Promise((resolveInput, reject) => { if (child.stdin.destroyed || child.stdin.writableEnded) { reject(new Error('Process stdin is closed')); return; } if (eof) child.stdin.end(bytes, resolveInput); else child.stdin.write(bytes, error => error ? reject(error) : resolveInput()); });
         resource.signal = signal => { if (process.platform === 'win32') killTree(child, signal === 'SIGKILL'); else { try { process.kill(-child.pid!, signal as NodeJS.Signals); } catch {} } };
       }
-      resource.close = () => { if (meta.state === 'running' && !closing) { closing = true; resource.signal?.('SIGTERM'); force = setTimeout(() => resource.signal?.('SIGKILL'), 1000); force.unref(); } };
+      resource.close = () => {
+        if (closing) return closing;
+        if (meta.state !== 'running') return;
+        resource.signal?.('SIGTERM');
+        closing = new Promise<void>(resolveClose => setTimeout(() => {
+          if (meta.state === 'running') resource.signal?.('SIGKILL');
+          resolveClose();
+        }, 1000));
+        return closing;
+      };
       if (args.timeoutMs) { timer = setTimeout(() => { meta.timedOut = true; void resource.close(); }, args.timeoutMs); timer.unref(); }
       this.journal.save(meta); this.audit.record('resource.process-started', { id: meta.id, pid: meta.pid, pty: args.pty, retainOnDisconnect: args.retainOnDisconnect });
       return { ...publicMeta(meta), resumeToken: token, output: 'Raw, unredacted bytes. Poll read from cursor 0 for live output; input/resize/signals are authorized for this handle.' };
@@ -116,7 +132,7 @@ export class SessionResources {
   private async startTransfer(task: Extract<AtomicTask, { operation: 'file.transfer' }>, owner: string, signal?: AbortSignal): Promise<unknown> {
     const args = task.arguments, path = resolve(args.path); let details: Record<string, unknown>;
     if (args.direction === 'download') { const stat = await lstat(path); if (!stat.isFile() || stat.isSymbolicLink()) throw new Error('Download requires a regular non-symlink file'); details = { path, size: stat.size, sha256: await fileHash(path), offset: 0 }; }
-    else { if (args.size === undefined || !args.sha256) throw new Error('Upload requires exact size and SHA-256'); const before = await currentHash(path); if (before !== null && !args.overwrite) throw new Error('Target exists; explicit overwrite authorization required'); details = { path, parent: await realpath(dirname(path)), temp: join(dirname(path), `.${basename(path)}.diagnose-${task.id}`), beforeSha256: before, size: args.size, sha256: args.sha256, offset: 0 }; }
+    else { if (args.size === undefined || !args.sha256) throw new Error('Upload requires exact size and SHA-256'); const before = await currentHash(path); if (before !== null && !args.overwrite) throw new Error('Target exists; explicit overwrite authorization required'); details = { path, parent: await realpath(dirname(path)), temp: join(dirname(path), `.${basename(path)}.diagnose-${task.id}`), beforeSha256: before, mode: before === null ? 0o600 : (await lstat(path)).mode & 0o777, size: args.size, sha256: args.sha256, offset: 0 }; }
     signal?.throwIfAborted(); const { resource, token } = this.create(task.id, args.direction, owner, args.retainOnDisconnect, details);
     const live = await this.restoreTransfer(resource.meta, owner, true); if (signal?.aborted || resource.owner !== owner) { await live.close(); throw new Error('Transfer authorization was cancelled'); } this.resources.set(task.id, live);
     this.audit.record('resource.transfer-opened', { id: task.id, direction: args.direction, path, size: details.size }); return { ...publicMeta(live.meta), resumeToken: token, encoding: 'base64', redaction: 'none; exact file bytes' };
@@ -137,7 +153,13 @@ export class SessionResources {
         if (meta.offset !== meta.size) throw new Error('Upload is incomplete'); await file.sync();
         if (await fileHash(String(meta.temp)) !== meta.sha256) throw new Error('Upload SHA-256 mismatch; destination untouched');
         if (await realpath(dirname(String(meta.path))) !== meta.parent || await currentHash(String(meta.path)) !== meta.beforeSha256) throw new Error('Destination changed since upload authorization');
-        await file.close(); closed = true; await rename(String(meta.temp), String(meta.path)); meta.state = 'committed'; this.journal.save(meta); this.audit.record('resource.file-changed', { id: meta.id, path: meta.path, beforeSha256: meta.beforeSha256, afterSha256: meta.sha256, bytes: meta.size }); return publicMeta(meta);
+        if (closed || resource.owner !== owner) throw new Error('Transfer authorization was revoked');
+        await file.chmod(Number(meta.mode ?? 0o600)); await file.close();
+        if (closed || resource.owner !== owner) throw new Error('Transfer authorization was revoked');
+        closed = true;
+        if (meta.beforeSha256 === null) { await link(String(meta.temp), String(meta.path)); await unlink(String(meta.temp)); }
+        else await rename(String(meta.temp), String(meta.path));
+        meta.state = 'committed'; this.journal.save(meta); this.audit.record('resource.file-changed', { id: meta.id, path: meta.path, beforeSha256: meta.beforeSha256, afterSha256: meta.sha256, bytes: meta.size }); return publicMeta(meta);
       };
     }
     return resource;
@@ -170,9 +192,9 @@ export class SessionResources {
     resource.close = async () => { server?.close(); for (const child of this.resources.values()) if (child.meta.parentId === task.id) await child.close(); resource.meta.state = 'closed'; this.journal.save(resource.meta); };
     this.journal.save(resource.meta); return { ...publicMeta(resource.meta), resumeToken: token };
   }
-  async disconnect(owner: string): Promise<void> { for (const resource of this.resources.values()) if (resource.owner === owner) { resource.owner = ''; if (!resource.meta.retainOnDisconnect) await resource.close(); } }
+  async disconnect(owner: string): Promise<void> { const affected = [...this.resources.values()].filter(resource => resource.owner === owner); for (const resource of affected) resource.owner = ''; await Promise.all(affected.filter(resource => !resource.meta.retainOnDisconnect).map(resource => resource.close())); }
   async abandon(task: AtomicTask, owner: string): Promise<void> { const id = task.operation === 'resource.resume' ? task.arguments.id : task.id, resource = this.resources.get(id); if (resource?.owner === owner) { resource.owner = ''; if (task.operation !== 'resource.resume' || !resource.meta.retainOnDisconnect) await resource.close(); } }
-  async revoke(owner?: string): Promise<void> { for (const resource of this.resources.values()) if (owner === undefined || resource.owner === owner) { resource.owner = ''; await resource.close(); } }
+  async revoke(owner?: string): Promise<void> { const affected = [...this.resources.values()].filter(resource => owner === undefined || resource.owner === owner); for (const resource of affected) resource.owner = ''; await Promise.all(affected.map(resource => resource.close())); }
   listLocal(): Record<string, unknown>[] { return [...this.resources.values()].map(resource => publicMeta(resource.meta)); }
   async localInput(id: string, value: Buffer): Promise<void> { const resource = this.resources.get(id); if (!resource?.input || resource.meta.state !== 'running') throw new Error('No live process with this ID'); this.audit.record('resource.local-input', { id, bytes: value.length }); await resource.input(value, false); }
   renewCredential(id: string): string { const meta = this.resources.get(id)?.meta ?? this.journal.load(id); const token = randomBytes(32).toString('base64url'); meta.tokenHash = sha256(Buffer.from(token)); this.journal.save(meta); this.audit.record('resource.local-credential-renewed', { id }); return token; }

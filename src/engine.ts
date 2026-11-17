@@ -19,6 +19,8 @@ function aborted<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
 export class ProbeEngine {
   private jobs = new Map<string, AbortController>();
   private seen = new Set<string>();
+  private sequence = 0;
+  private sequenced?: boolean;
   private idle?: NodeJS.Timeout;
   private lifetime?: NodeJS.Timeout;
   private mode: PermissionMode = 'ask';
@@ -51,9 +53,19 @@ export class ProbeEngine {
       if (message.type === 'task.cancel') { try { audit.record('task.cancel-requested', { id: message.id, source: 'operator' }); this.jobs.get(message.id)?.abort(); void this.resources.control(this.owner, { id: message.id, action: 'close', cursor: 0, limit: 65536, eof: false }).catch(() => {}); } catch { peer.close('Audit unavailable'); } return; }
       if (message.type !== 'task.request') { peer.close('Unexpected operator message'); return; }
       const task = message.task;
-      if (this.seen.has(task.id)) { void this.reply(task.id, { status: 'duplicate' }); return; }
-      if (this.jobs.size >= 4 || this.seen.size >= 1000) { void this.reply(task.id, { status: 'error', error: 'Four concurrent task slots or session task limit reached; wait or close unused work' }); return; }
-      const controller = new AbortController(); this.jobs.set(task.id, controller); this.seen.add(task.id);
+      this.sequenced ??= message.sequence !== undefined;
+      if (this.sequenced !== (message.sequence !== undefined)) { peer.close('Task sequence mode cannot change'); return; }
+      if (message.sequence !== undefined) {
+        if (message.sequence <= this.sequence) { void this.reply(task.id, { status: 'duplicate' }); return; }
+        this.sequence = message.sequence;
+      } else {
+        if (this.seen.has(task.id)) { void this.reply(task.id, { status: 'duplicate' }); return; }
+        if (this.seen.size >= 1000) { void this.reply(task.id, { status: 'error', error: 'Legacy client task limit: reconnect and update both endpoints to 0.5.0+. This request was not executed.' }); return; }
+        this.seen.add(task.id);
+      }
+      if (this.jobs.has(task.id)) { void this.reply(task.id, { status: 'duplicate' }); return; }
+      if (this.jobs.size >= 4) { void this.reply(task.id, { status: 'error', error: 'Four tasks are active; wait for completion before submitting new work' }); return; }
+      const controller = new AbortController(); this.jobs.set(task.id, controller);
       void this.run(task, controller);
     });
     peer.on('closed', () => { clearTimeout(this.idle); clearTimeout(this.lifetime); for (const controller of this.jobs.values()) controller.abort(); void this.resources.disconnect(this.owner).catch(() => {}); try { audit.record('session.closed', {}); } catch { /* Session is already closed. */ } });
@@ -66,6 +78,7 @@ export class ProbeEngine {
   }
   private async decidePermission(request: Approval): Promise<boolean> {
     request.signal!.throwIfAborted();
+    this.audit.history.event(request.task.id, 'approval-preview', { stage: request.stage, digest: request.digest, preview: request.preview });
     if (this.mode === 'auto') {
       this.audit.record('task.auto-approved', { id: request.task.id, stage: request.stage, digest: request.digest, ...(request.bytes === undefined ? {} : { bytes: request.bytes }) });
       this.notice(`[AUTO ${request.stage}] ${request.task.operation} ${request.task.id}\n${safeText(request.preview.slice(0, 8192))}${request.preview.length > 8192 ? '\n[Terminal preview truncated; task digest and byte counts are audited.]' : ''}`);
@@ -131,6 +144,7 @@ export class ProbeEngine {
   private async run(task: Task, controller: AbortController): Promise<void> {
     const { signal } = controller; const hash = digest(task);
     try {
+      this.audit.history.begin(task);
       const steps = task.operation === 'batch.run' ? task.arguments.steps : [task];
       if (task.operation === 'batch.run' && steps.some(step => resourceOperation(step.operation))) throw new Error('Open interactive/transfer/forward resources separately; their subsequent actions share one approved scope');
       if (task.operation === 'batch.run') this.audit.record('task.requested', { id: task.id, operation: task.operation, digest: hash, steps: steps.length });
@@ -146,6 +160,7 @@ export class ProbeEngine {
       this.audit.record('task.approved', { id: task.id, digest: hash, mode: this.mode });
       await this.peer.send({ type: 'task.started', id: task.id, digest: hash });
       const execution = task.operation === 'batch.run' ? await this.runBatch(task, signal, writes, hash) : await this.runAtomic(task, signal, writes.get(task.id));
+      this.audit.history.collected(task.id, execution);
       const count = execution.outputs.reduce((sum, item) => sum + item.bytes.length, 0);
       if (task.operation === 'batch.run') this.audit.record('task.collected', { id: task.id, bytes: count, status: execution.result.status });
       signal.throwIfAborted();
@@ -159,7 +174,7 @@ export class ProbeEngine {
       if (signal.aborted && task.operation !== 'batch.run' && resourceOperation(task.operation)) await this.resources.abandon(task, this.owner).catch(() => {});
       try { this.audit.record('task.failed', { id: task.id, status }); } catch { this.peer.close('Audit unavailable'); }
       await this.finish(task.id, { status, error: signal.aborted ? 'Cancelled' : redact((error as Error).message).slice(0, 2000) });
-    } finally { this.jobs.delete(task.id); }
+    } finally { this.jobs.delete(task.id); try { this.audit.history.finish(task.id); } catch { this.peer.close('Local history unavailable'); } }
   }
   private async transfer(id: string, execution: Execution, signal: AbortSignal): Promise<void> {
     let index = 0; const encodings: Record<string, string> = {};

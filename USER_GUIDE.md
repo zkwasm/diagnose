@@ -54,7 +54,7 @@ In the agent conversation, provide the code and a concrete problem:
 
 The person receiving help checks the diagnostician's label and connection fingerprint, then chooses `y` to review tasks and result transfers. Choosing `a` instead grants automatic execution **and transmission** under the displayed terms. Commands run with that user's OS permissions; results can reach the diagnostician and their AI provider.
 
-The diagnostician directs the agent to investigate, repair within permission, and check the result. The user can type `permissions ask` to revoke automatic approval or `exit` to stop access.
+The diagnostician directs the agent to investigate, repair within permission, and check the result. The user can type `permissions ask` to revoke automatic approval or `exit` to stop access. Afterward, `diagnose history` lists local task records and `diagnose show TASK_ID` shows what was requested, collected, and sent.
 
 ### Return later or load a device procedure
 
@@ -93,7 +93,7 @@ For an AI session, the diagnostician must separately install and sign in to Code
 
 Node.js 20.10+ runtime compatibility is available in Diagnose 0.5.0+. Earlier Diagnose packages declare Node.js 22.18+; use a compatible Diagnose version rather than automatically upgrading the user's Node.js. The relay deployment wrapper requires Node.js 22+ separately.
 
-Use the latest package on both endpoints. Session agent launchers require 0.3.1 or later; live resource features require 0.3 or later. macOS probes and the Linux relay have been tested. Linux and Windows probes, including Windows ConPTY and Gemini symlink permissions, remain experimental.
+Use the latest package on both endpoints. Session agent launchers require 0.3.1 or later; live resource features require 0.3 or later. macOS probes and the Linux relay have been tested. Linux and Windows probes, including Windows ConPTY and interactive authentication, remain experimental.
 
 ## First-time setup: install Node.js and npm
 
@@ -337,7 +337,7 @@ Options before `--` belong to Diagnose. Everything after it is passed literally 
 
 - **Codex:** receives temporary `-c` MCP overrides.
 - **Claude Code:** receives a temporary `--mcp-config` value.
-- **Gemini CLI:** uses a private temporary user configuration directory. Diagnose copies the user settings, adds its MCP entry, and links existing login/history files. Administrator policies and workspace trust checks remain in effect. The directory is removed on normal exit; changes to user settings in this Gemini session are not written back to the original `settings.json`.
+- **Gemini CLI:** uses a private temporary user configuration directory. Diagnose copies the user settings, adds its MCP entry, and links existing login/history files. Administrator policies and workspace trust checks remain in effect. On Windows, directories use junctions and login files are copied into the private temporary directory, avoiding administrator-only file symlinks. Sign in with the native Gemini CLI first; changes to copied login files in this session are not saved back. The directory is removed on normal exit; changes to user settings in this Gemini session are not written back to the original `settings.json`.
 
 The launcher does not add a permanent MCP entry. Other MCP servers already configured in your agent may still load. If you previously registered Diagnose globally, remove that entry separately if you no longer want it in ordinary sessions. An uncatchable kill or power loss may leave a temporary directory behind.
 
@@ -375,7 +375,7 @@ Type these into the user's probe terminal:
 
 Only the user can enable automatic mode. Remote requests cannot switch it on. New pairings start with manual approval unless the user explicitly chooses `a` again. Already transmitted data cannot be recalled. Completed changes are not automatically rolled back.
 
-Do not ask the AI to collect OS passwords. For interactive authentication, the user can use local hidden input with a trusted foreground program; Diagnose does not automatically elevate privileges. Hidden input has not been validated on Windows.
+Do not ask the AI to collect OS passwords. For interactive authentication, the user can use local hidden input with a trusted foreground program; Diagnose does not automatically elevate privileges. Hidden input has not been validated on Windows. On macOS/Linux, ordinary descendants in a managed process group are terminated when its leader exits or the resource is closed. This is not OS sandbox containment: a deliberately detached daemon can escape that group; Windows process-tree termination still requires real-device validation.
 
 ## 5. What the agent can do
 
@@ -432,7 +432,7 @@ Agents use `diagnose_process` for the same live capabilities. Non-PTY processes 
 
 ### Files
 
-`file.read` returns a bounded range of up to 1 MiB. `file.write` previews text and checks the previous hash before replacing a target. File listing, stat, mkdir, removal, rename, and chmod are available; rename refuses an existing destination unless overwrite is explicit.
+`file.read` returns a bounded range of up to 1 MiB. `file.write` previews text and checks the previous hash before replacing a target. File listing, stat, mkdir, removal, rename, and chmod are available; rename refuses an existing destination unless overwrite is explicit. File transfers preserve existing destination permission bits. New transfer destinations are committed without replacing a concurrently created file; downloads with overwrite enabled reject a destination changed during transfer. Existing-file replacement checks the target immediately before commit, but does not lock out unrelated local writers.
 
 Use `diagnose_transfer` for large or binary files. It takes paths rather than placing base64 file contents into the AI context. `localPath` refers to the diagnostician's computer; `remotePath` refers to the user's computer.
 
@@ -517,7 +517,28 @@ The diagnostician, their endpoint software, and their AI provider can see result
 
 `~/.diagnose/audit-*.jsonl` uses mode `0600`. Events record task IDs, operation types, target paths/executables/interpreters, ranges and serial settings, argument digests, decisions, collection/transmission byte counts, cancellations, and outcomes. Batch steps include their parent task and individual status. Automatic mode records its permission changes and automatic approvals.
 
-Built-in file mutations record paths and, where available, before/after hashes and byte counts. Default audit logs do not store full command arguments, script source, or raw collected contents. They are not a complete command replay or filesystem monitor. Audit writes are flushed; an unwritable audit log stops the affected operation.
+Built-in file mutations record paths and, where available, before/after hashes and byte counts. JSONL audit logs contain metadata only; the separate encrypted history below stores full tasks and finite collected results. Neither is a filesystem monitor: arbitrary programs can change files, services, and devices outside the built-in operations. Audit writes are flushed; an unwritable audit log stops the affected operation. Metadata logs rotate at 8 MiB; inactive archives are pruned after seven days or when their aggregate budget exceeds 32 MiB.
+
+### Review local history and clean up
+
+Available in **0.5.0+** on the computer receiving help:
+
+```sh
+diagnose history
+diagnose show TASK_ID
+diagnose show RESOURCE_ID --cursor 0
+diagnose cleanup
+# Remove all inactive local history and resources now:
+diagnose cleanup --days 0
+```
+
+History records exact requested commands or scripts, approval previews, decisions, finite collected results (including results the user declined to send), attempted transfers, and known built-in changes. A completed send records that the local transport accepted it, not proof that a human read it. Continuous process output is stored in the resource journal; `show` returns a page with a cursor for the next page. Remote process input is recorded locally; hidden input entered with `secret` records only its byte count. Raw tunnel traffic and exact transferred file bodies are not duplicated in task history; their scope, paths, hashes, and traffic counts are recorded. Arbitrary script side effects and automatic rollback are not provided.
+
+Full history can contain sensitive data, even if results were never sent. It is encrypted locally in `~/.diagnose/history`, with the key beside it under the same user account. This protects against casual file inspection, not someone controlling that account. History is not automatically uploaded and has no dedicated remote MCP tool. An authorized remote command still has your OS account's file access.
+
+History and resource journals each have a **256 MiB / 2,000-record** budget. Inactive records expire after **seven days** and may be evicted sooner to stay within budget. Maintenance runs when storage is used and when `cleanup` is requested. Live retained resources are protected; if they exhaust the budget, collection stops rather than growing without bound. Close unused jobs before cleaning up. Abandoned upload staging files are removed with expired resource records; destination files and remembered pairings are never deleted by cleanup. Upload staging bytes are separate from the journal budget and consume space beside the destination.
+
+Both endpoints at 0.5.0+ use increasing task sequence numbers, so a connection can run more than 1,000 tasks while rejecting replayed sequences. The diagnostician retains at most 128 task results and 32 MiB in memory; save needed results or use local history before they expire. Older clients retain the 1,000-task limit and require an explicit reconnect. Neither path automatically repeats a modifying command.
 
 ### Saved output and recovery data
 

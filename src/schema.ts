@@ -41,7 +41,7 @@ export type ResourceRequest = z.infer<typeof resourceRequestSchema>;
 export type WireMessage =
   | { type: 'session.accepted'; label: string; fingerprint: string; credential?: string }
   | { type: 'session.closed'; reason: string }
-  | { type: 'task.request'; task: Task }
+  | { type: 'task.request'; task: Task; sequence?: number }
   | { type: 'task.started'; id: string; digest: string }
   | { type: 'task.output'; id: string; stream: string; chunk: string; index: number }
   | { type: 'task.result'; id: string; result: Result }
@@ -55,7 +55,7 @@ export type WireMessage =
 export function parseMessage(value: unknown): WireMessage {
   const basic = z.object({ type: z.string() }).passthrough().parse(value);
   switch (basic.type) {
-    case 'task.request': return { type: basic.type, task: taskSchema.parse(basic.task) };
+    case 'task.request': return { type: basic.type, task: taskSchema.parse(basic.task), ...(basic.sequence === undefined ? {} : { sequence: z.number().int().min(1).max(Number.MAX_SAFE_INTEGER).parse(basic.sequence) }) };
     case 'task.cancel': return { type: basic.type, id: z.string().uuid().parse(basic.id) };
     case 'resource.request': return { type: basic.type, requestId: z.string().uuid().parse(basic.requestId), request: resourceRequestSchema.parse(basic.request) };
     case 'resource.result': return z.object({ type: z.literal('resource.result'), requestId: z.string().uuid(), value: z.unknown().optional(), error: z.string().max(2000).optional() }).strict().parse(value);

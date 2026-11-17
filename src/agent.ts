@@ -1,12 +1,13 @@
 import { spawn } from 'node:child_process';
 import { constants } from 'node:os';
-import { mkdtemp, readFile, writeFile, rm, mkdir, readdir, symlink } from 'node:fs/promises';
+import { mkdtemp, readFile, writeFile, rm, mkdir, readdir, symlink, stat, copyFile } from 'node:fs/promises';
 import { tmpdir, homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import { PairingStore } from './pairing.js';
 import { loadSkill, skillPrompt } from './skill.js';
+import { agentCommand } from './agent-command.js';
 
 export const agentUsage = 'diagnose agent codex|claude|gemini [--device NAME] [--skill FILE.md|DIRECTORY] [--relay URL] [-- agent arguments...]';
 
@@ -53,14 +54,21 @@ export async function launchAgent(argv: string[]): Promise<number> {
       const configRoot = join(directory, '.gemini'); await mkdir(configRoot, { mode: 0o700 });
       let entries: string[] = [];
       try { entries = await readdir(originalRoot); } catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; }
-      for (const name of entries) if (name !== 'settings.json') await symlink(join(originalRoot, name), join(configRoot, name));
+      for (const name of entries) if (name !== 'settings.json') {
+        const source = join(originalRoot, name), target = join(configRoot, name);
+        if (process.platform === 'win32') {
+          if ((await stat(source)).isDirectory()) await symlink(source, target, 'junction');
+          else await copyFile(source, target);
+        } else await symlink(source, target);
+      }
       const path = join(configRoot, 'settings.json');
       await writeFile(path, JSON.stringify({ ...settings, mcpServers: { ...(settings.mcpServers as object ?? {}), diagnose: server } }), { mode: 0o600 });
       env.GEMINI_CLI_HOME = directory; args = extra;
     }
     if (prompt) args = agent === 'gemini' ? [...args, '--include-directories', taskDirectory!, '--prompt-interactive', prompt] : [...args, '--add-dir', taskDirectory!, '--', prompt];
+    const command = await agentCommand(agent, args, env);
     return await new Promise<number>((resolveExit, reject) => {
-      const child = spawn(agent, args, { env, stdio: 'inherit', shell: false });
+      const child = spawn(command.command, command.args, { env, stdio: 'inherit', shell: false });
       const interrupt = () => { child.kill('SIGINT'); }, terminate = () => { child.kill('SIGTERM'); };
       process.on('SIGINT', interrupt); process.on('SIGTERM', terminate);
       const cleanup = () => { process.off('SIGINT', interrupt); process.off('SIGTERM', terminate); };

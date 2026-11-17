@@ -2,6 +2,7 @@ import { mkdir, readFile, writeFile, copyFile, cp } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
 import { Marked } from 'marked';
 const root = resolve(import.meta.dirname, '..'), out = join(root, '.site-dist');
+const releaseNotice = '<aside class="release-note wrap" aria-label="Release availability">The v0.5.0 feature guide is a preview while npm publication awaits verification. The current npm release is v0.3.2. Startup skills and saved device pairing require the upcoming release.</aside>';
 await mkdir(join(out, 'guide'), { recursive: true });
 await mkdir(join(out, 'media'), { recursive: true });
 for (const name of ['index.html', 'style.css', 'icon.svg']) await copyFile(join(root, 'site', name), join(out, name));
@@ -16,4 +17,8 @@ const toc = headings.map(item => `<a href="#${item.id}">${escape(item.title)}</a
 await writeFile(join(out, 'guide/index.html'), `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>User guide — Diagnose</title><meta name="description" content="Connect your AI agent to investigate a remote problem, apply authorized fixes, and verify results. Setup, permissions, recovery, and security explained."><link rel="canonical" href="https://diagnose.fenginwind.com/guide/"><link rel="icon" href="/icon.svg" type="image/svg+xml"><link rel="stylesheet" href="/style.css"></head><body><a class="skip" href="#main">Skip to content</a><header class="nav wrap"><a class="brand" href="/" aria-label="Diagnose home"><span class="brand-icon" aria-hidden="true">›_</span>diagnose<span class="wordmark-dot">.</span></a><nav aria-label="Main navigation"><a href="/#how-it-works">How it works</a><a href="/#capabilities">Capabilities</a><a href="/guide/" aria-current="page">User guide</a><a class="github" href="https://github.com/zkwasm/diagnose">GitHub ↗</a></nav></header><main class="wrap guide-layout" id="main"><aside class="guide-toc"><strong>ON THIS PAGE</strong>${toc}</aside><article class="guide-content">${article}</article></main><footer class="wrap footer"><a class="brand" href="/">diagnose<span class="wordmark-dot">.</span></a><span>Open source. Human permission.</span><nav aria-label="Footer"><a href="/">Home</a><a href="https://github.com/zkwasm/diagnose">GitHub ↗</a><a href="https://www.npmjs.com/package/@masstensor/diagnose">npm ↗</a></nav></footer></body></html>`);
 await writeFile(join(out, 'robots.txt'), 'User-agent: *\nAllow: /\nSitemap: https://diagnose.fenginwind.com/sitemap.xml\n');
 await writeFile(join(out, 'sitemap.xml'), '<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>https://diagnose.fenginwind.com/</loc></url><url><loc>https://diagnose.fenginwind.com/guide/</loc></url></urlset>');
+for (const page of ['index.html', 'guide/index.html']) {
+  const path = join(out, page);
+  await writeFile(path, (await readFile(path, 'utf8')).replace('</header>', '</header>' + releaseNotice));
+}
 console.log('Built landing page, English guide, and video assets in .site-dist/');

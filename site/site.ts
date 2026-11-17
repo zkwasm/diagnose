@@ -8,7 +8,7 @@ for (const button of document.querySelectorAll<HTMLButtonElement>('.copy')) {
       window.setTimeout(() => { button.textContent = previous; button.classList.remove('copied'); }, 1800);
     } catch {
       if (status) status.textContent = 'Copy unavailable. Select and copy the command manually.';
-      const code = button.closest('.command-line')?.querySelector('code');
+      const code = button.closest('.command-line, .quick-command')?.querySelector('code');
       if (code) { const range = document.createRange(); range.selectNodeContents(code); const selection = window.getSelection(); selection?.removeAllRanges(); selection?.addRange(range); }
     }
   });

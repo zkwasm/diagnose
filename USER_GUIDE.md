@@ -1,6 +1,6 @@
 # Diagnose user guide
 
-Diagnose gives an AI agent a temporary connection to a consenting user's computer. The same probe can inspect the computer itself, a USB device, or a device reachable on its local network.
+Diagnose helps an AI agent remotely diagnose and resolve problems on a consenting user's computer or connected devices. The goal is to move from a reported symptom to an authorized fix and a checked result. The same probe can access the computer itself, a USB device, or a device reachable on its local network.
 
 There are two people in a session:
 
@@ -8,6 +8,20 @@ There are two people in a session:
 - **Diagnostician:** the person directing the AI agent. They run `diagnose agent codex`, `diagnose agent claude`, or `diagnose agent gemini` and give the agent the user's pairing code.
 
 The AI runs on the diagnostician's side. The user does not need to install an AI agent or configure MCP.
+
+## From a reported problem to a verified result
+
+Use the session to work toward a concrete outcome:
+
+1. **Describe the problem.** Explain what fails, what you expected, and how to reproduce it. Agree on the check that will show whether the problem is resolved.
+2. **Investigate first.** Ask the agent to inspect the environment and collect relevant logs or other evidence. Distinguish confirmed facts from possible causes.
+3. **Review a repair plan.** Have the agent explain what it intends to change, why, the expected impact, and any recovery option. Where practical, preserve the original configuration before editing it.
+4. **Apply authorized changes.** The agent can use commands, scripts, file edits, and device tools under the user's existing permission mode. Only proceed within the agreed scope.
+5. **Verify the result.** Repeat the original failing action or an appropriate health check. Ask for a summary of what changed, the verification evidence, and anything still unresolved. An executed command alone does not establish that the user's problem is fixed.
+
+These are instructions for directing the agent, not a separate enforced plan-approval system. The local task/channel permissions described below still apply. Automatic mode continues to allow execution and transmission under the user's grant; general automatic rollback is not provided.
+
+You can also request a read-only investigation and stop after the explanation. Computer software, configuration, local services, networks, and connected hardware can all be investigated with the same general-purpose tools; successful fixes depend on the issue, available access, and the user's authorization.
 
 ## 1. Requirements
 
@@ -128,7 +142,7 @@ Do **not** separately run `diagnose mcp` or register a global MCP server. The la
 
 Then tell the agent what to inspect and provide the pairing code in the agent conversation. For example:
 
-> Use Diagnose to connect to pairing code D1.… . Inspect the user's USB-connected gateway, collect its logs, and explain why it is offline. Only read data. Do not reset, flash, or modify configuration.
+> Use Diagnose to connect to pairing code D1.… . Help resolve the user's application startup failure. First investigate without changing anything. Explain the cause, proposed fix, and risks. Apply only authorized changes, then check whether the application starts successfully. Summarize what changed and anything still unresolved.
 
 The code and diagnostic results enter your chosen AI provider's context. The user must still accept the connection on their own computer. Ask the agent to use the `diagnose_*` tools for remote actions: its normal shell and file tools still act on the diagnostician's computer.
 

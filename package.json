@@ -1,7 +1,7 @@
 {
   "name": "@masstensor/diagnose",
   "version": "0.3.2",
-  "description": "End-to-end encrypted, user-approved remote diagnostics over a blind relay",
+  "description": "Agent-led remote troubleshooting and problem resolution, with end-to-end encryption and user-controlled permissions",
   "type": "module",
   "license": "MIT",
   "publishConfig": {

@@ -1,8 +1,8 @@
 # Diagnose
 
-**Give your AI agent a temporary, user-approved connection to another computer.**
+**Diagnose and fix problems remotely with your AI agent.**
 
-Diagnose is an open-source remote diagnostics probe for computers, USB devices, and devices on a user's local network. It connects Codex, Claude Code, Gemini CLI, or another MCP client to a user-controlled CLI through an end-to-end encrypted relay.
+Diagnose is an open-source tool for agent-led remote troubleshooting and problem resolution. It gives Codex, Claude Code, Gemini CLI, or another MCP client the remote tools to investigate a user's computer or connected device, apply authorized fixes, and verify the result. A user-controlled probe and an end-to-end encrypted relay provide the connection.
 
 [User guide](USER_GUIDE.md) · [Source](https://github.com/zkwasm/diagnose) · [npm](https://www.npmjs.com/package/@masstensor/diagnose) · [Website](https://diagnose.fenginwind.com)
 
@@ -27,7 +27,7 @@ npx @masstensor/diagnose@latest agent codex
 
 The agent launcher requires **0.3.1+**. It loads Diagnose MCP for this launch without adding a permanent MCP entry. Tell the agent:
 
-> Use Diagnose to connect to this pairing code: D1.… . Inspect the user's connected device and collect its logs. Only read data; do not modify configuration.
+> Use Diagnose to connect to this pairing code: D1.… . Help resolve the user's application startup failure. First investigate without changing anything. Explain the cause, proposed fix, and risks. Apply only authorized changes, then check whether the application starts successfully and report anything still unresolved.
 
 The user must approve the connection locally. They choose per-task approval or automatic execution **and transmission** for this temporary session. Possessing a pairing code does not establish the diagnostician's real identity.
 
@@ -40,7 +40,17 @@ diagnose start
 diagnose agent codex
 ```
 
-## What it can do
+## From problem to verified result
+
+1. **Define the problem:** agree on the symptom and what a successful outcome looks like.
+2. **Investigate:** inspect the environment, gather evidence, and identify the likely cause.
+3. **Plan the fix:** explain the proposed changes, their impact, and recovery options where available.
+4. **Act with permission:** use approved commands, scripts, or file changes to carry out the fix.
+5. **Verify and hand off:** repeat the original check, summarize changes, and identify any remaining issues.
+
+This is an agent-guided workflow using the existing tools and permission model. Diagnose does not automatically prove a repair succeeded or roll back arbitrary changes. See the [troubleshooting workflow](USER_GUIDE.md#from-a-reported-problem-to-a-verified-result).
+
+## Remote tools
 
 | Capability | Interface |
 | --- | --- |

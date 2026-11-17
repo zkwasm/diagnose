@@ -3,7 +3,6 @@ import { resolve, join } from 'node:path';
 import { Marked } from 'marked';
 import { createHash } from 'node:crypto';
 const root = resolve(import.meta.dirname, '..'), out = join(root, '.site-dist');
-const releaseNotice = '<aside class="release-note wrap" aria-label="Release availability">The v0.5.0 feature guide is a preview while npm publication awaits verification. The current npm release is v0.3.2. Node.js 20.10 compatibility, startup skills and saved device pairing require the upcoming release.</aside>';
 await mkdir(join(out, 'guide'), { recursive: true });
 await mkdir(join(out, 'media'), { recursive: true });
 await mkdir(join(out, 'setup'), { recursive: true });
@@ -23,7 +22,7 @@ await writeFile(join(out, 'sitemap.xml'), '<?xml version="1.0" encoding="UTF-8"?
 const assets = await Promise.all(['style.css', 'site.js'].map(async name => ({ name, version: createHash('sha256').update(await readFile(join(out, name))).digest('hex').slice(0, 12) })));
 for (const page of ['index.html', 'guide/index.html']) {
   const path = join(out, page);
-  let html = (await readFile(path, 'utf8')).replace('</header>', '</header>' + releaseNotice);
+  let html = await readFile(path, 'utf8');
   for (const { name, version } of assets) html = html.replaceAll(`"/${name}"`, `"/${name}?v=${version}"`);
   await writeFile(path, html);
 }

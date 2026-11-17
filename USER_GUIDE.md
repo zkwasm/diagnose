@@ -9,6 +9,59 @@ There are two people in a session:
 
 The AI runs on the diagnostician's side. The user does not need to install an AI agent or configure MCP.
 
+## Quick start
+
+### 1. Prepare both computers
+
+Install **Node.js 22.18+**, including npm, using the [first-time setup instructions](#first-time-setup-install-nodejs-and-npm). Open Terminal on macOS/Linux or Command Prompt on Windows. Check:
+
+```sh
+node --version
+npm --version
+```
+
+Only the **diagnostician** needs an installed, signed-in Codex CLI, Claude Code, or Gemini CLI. The person receiving help needs no AI account.
+
+### 2. On the computer receiving help
+
+```sh
+npx @masstensor/diagnose@latest start
+```
+
+If npm asks to install the package, type `y`. Keep this terminal open. Send the complete `D1.…` code privately to your diagnostician.
+
+### 3. On the diagnostician's computer
+
+```sh
+npx @masstensor/diagnose@latest agent codex
+# Or replace codex with claude or gemini.
+```
+
+In the agent conversation, provide the code and a concrete problem:
+
+> Use Diagnose to connect to this code: D1.… . Investigate why the user's application fails to start. Explain the proposed fix before changing anything, apply only authorized changes, and verify that the application starts afterward.
+
+### 4. Approve, diagnose, and finish
+
+The person receiving help checks the diagnostician's label and connection fingerprint, then chooses `y` to review tasks and result transfers. Choosing `a` instead grants automatic execution **and transmission** under the displayed terms. Commands run with that user's OS permissions; results can reach the diagnostician and their AI provider.
+
+The diagnostician directs the agent to investigate, repair within permission, and check the result. The user can type `permissions ask` to revoke automatic approval or `exit` to stop access.
+
+### Return later or load a device procedure
+
+**Requires v0.5.0+ on both computers.** Use a release supporting these options before following the additional commands below.
+
+```sh
+npm install -g @masstensor/diagnose@latest
+# Diagnostician: pair once while the user's probe is running.
+diagnose pair --name alice-pc
+# User: explicitly approve remembering this diagnostician.
+# Diagnostician: use this whenever diagnosis is needed again.
+diagnose agent codex --device alice-pc --skill ./devices/owon.md
+```
+
+The skill file is your local Markdown procedure; create it first or omit `--skill`. The same flags work with `claude` and `gemini`. The user must keep `diagnose start` running, or start it again after a restart. Pairing survives; execution approval remains separately controlled. See [remembered pairing](#keep-a-device-paired-for-future-diagnosis) and [skills](#start-with-a-device-skill-or-markdown-task) for full details.
+
 ## From a reported problem to a verified result
 
 Use the session to work toward a concrete outcome:

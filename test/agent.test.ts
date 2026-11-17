@@ -11,7 +11,7 @@ const cli = resolve('dist/cli.js');
 
 function fixture() {
   const root = mkdtempSync(join(tmpdir(), 'diagnose agent test ')), capture = join(root, 'capture.json'), settings = join(root, '.gemini', 'settings.json');
-  mkdirSync(join(root, '.gemini')); 
+  mkdirSync(join(root, '.gemini'));
   writeFileSync(settings, JSON.stringify({ security: { marker: 'preserve-admin-policy' }, mcpServers: { existing: { command: 'unchanged' } } }));
   for (const name of ['.codex', '.claude', '.gemini']) { mkdirSync(join(root, name), { recursive: true }); writeFileSync(join(root, name, 'sentinel'), 'unchanged'); }
   const client = pathToFileURL(require.resolve('@modelcontextprotocol/sdk/client/index.js')).href, transport = pathToFileURL(require.resolve('@modelcontextprotocol/sdk/client/stdio.js')).href;

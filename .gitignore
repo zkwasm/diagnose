@@ -7,3 +7,5 @@ logs/
 .DS_Store
 test/live-*.ts
 .site-dist/
+video/audio-en/
+video/output/

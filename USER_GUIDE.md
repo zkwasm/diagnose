@@ -357,4 +357,4 @@ Commands run with the current user's OS permissions. Diagnose neither provides a
 
 The public relay is hosted at `diagnose.fenginwind.com`. You can self-host using the deployment templates in the repository. Keep local credentials, hardware logs, firmware, and resource journals out of server deployments and public packages.
 
-The existing one-minute explainer video remains in Chinese. It demonstrates version 0.2's batch and permission flow and predates live resources and the one-command agent launcher. Its screen content is an illustration, not a live session.
+The [one-minute English walkthrough](https://diagnose.fenginwind.com/#walkthrough) covers the current agent launcher, local permissions, encrypted transport, investigation, authorized repair, and verification. It includes English narration and captions. The port-mismatch repair is an illustrative example, not a live diagnosis. The earlier Chinese video is retained separately.

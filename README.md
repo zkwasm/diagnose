@@ -89,7 +89,7 @@ npm pack
 
 Tests exercise the actual encrypted protocol, approval boundaries, native terminals, transfers, forwarding, recovery, and the stdio MCP interface. The Noise tests include a public Cacophony interoperability vector. Hardware acceptance scripts and device logs are not distributed.
 
-The `site/` directory contains the static landing page, a small TypeScript interaction module, and a build script that renders the guide. Run `npm run build:site` and `npm run check:site`; serve `.site-dist/` to preview. No analytics, third-party scripts, or cookies are required. The existing Chinese explainer video is retained separately; it illustrates version 0.2 and predates the session agent launcher.
+The `site/` directory contains the static landing page, a small TypeScript interaction module, and a build script that renders the guide. Run `npm run build:site` and `npm run check:site`; serve `.site-dist/` to preview. No analytics, third-party scripts, or cookies are required. The website features a 60-second English animation covering the current agent launcher, permissions, encrypted relay, investigation, authorized repair, and result verification. Its repair story is illustrative, not a live diagnosis. Reproduce it with `npm run video:render`; see [video documentation](https://github.com/zkwasm/diagnose/blob/main/video/README.md). The earlier Chinese video is retained unchanged.
 
 ## Relay deployment
 

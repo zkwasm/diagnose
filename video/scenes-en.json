@@ -1,0 +1,65 @@
+[
+  {
+    "start": 0,
+    "end": 5,
+    "title": "From a problem to a checked result.",
+    "subtitle": "Remote troubleshooting with your AI agent",
+    "voice": "A remote problem. Your AI agent. A clear path from diagnosis to resolution."
+  },
+  {
+    "start": 5,
+    "end": 12,
+    "title": "Start on the user's computer.",
+    "subtitle": "Node.js 22.18+ · No AI account needed on this side",
+    "voice": "The user starts Diagnose and shares a short-lived pairing code privately. Our guide explains how to install Node first."
+  },
+  {
+    "start": 12,
+    "end": 19,
+    "title": "Bring the agent you already use.",
+    "subtitle": "Codex · Claude Code · Gemini CLI",
+    "voice": "Launch Codex, Claude Code, or Gemini with Diagnose. Remote tools load for this session, without permanent setup."
+  },
+  {
+    "start": 19,
+    "end": 26,
+    "title": "The user chooses the permissions.",
+    "subtitle": "Check the self-reported label and session fingerprint",
+    "voice": "The user confirms the connection locally. Review each task, or explicitly allow automatic execution and transmission for this session."
+  },
+  {
+    "start": 26,
+    "end": 33,
+    "title": "Encrypted between the endpoints.",
+    "subtitle": "The relay forwards ciphertext, not readable commands or results",
+    "voice": "Commands and results are encrypted between the endpoints. The relay sees connection metadata. Your chosen AI provider can see the results."
+  },
+  {
+    "start": 33,
+    "end": 41,
+    "title": "Investigate. Then explain the fix.",
+    "subtitle": "Illustrative example: an application cannot reach its local service",
+    "voice": "The agent collects evidence and finds a port mismatch. It explains the proposed configuration change, its impact, and how to restore the original."
+  },
+  {
+    "start": 41,
+    "end": 48,
+    "title": "Carry out the authorized repair.",
+    "subtitle": "Commands, scripts, files, live terminals, networks, and connected devices",
+    "voice": "With permission, the agent applies the fix. Terminals, files, networks, and device tools support deeper work."
+  },
+  {
+    "start": 48,
+    "end": 55,
+    "title": "Check the original problem again.",
+    "subtitle": "A command finishing is not proof that the problem is solved",
+    "voice": "Repeat the failing check, then summarize the result. Local audit events record actions, changes, and data transfers."
+  },
+  {
+    "start": 55,
+    "end": 60,
+    "title": "Diagnose and fix. Remotely.",
+    "subtitle": "Open source. Human permission.",
+    "voice": "The user can revoke access anytime. Diagnose and fix, with your AI agent."
+  }
+]

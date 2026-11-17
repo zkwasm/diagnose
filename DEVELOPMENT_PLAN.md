@@ -63,3 +63,7 @@ Ship each completed milestone with English CLI help, guide examples and tests. M
 - npm publication awaits official account verification.
 
 The first release deliberately retains explicit pinned revisions, a personal capability-based library, human draft review, and agent-assessed device status. Team roles/public catalogs, automatic rollback, native agent skill installation, proof of inventory freshness, and an independent security audit are outside this plan.
+
+## 0.7 invitation usability
+
+Implemented nine-letter invitations with a 30-minute deadline, OPAQUE endpoint authentication, local consent, independent endpoint attempt limits, and unchanged high-entropy remembered credentials. Session idle/lifetime clocks now begin after pairing. Legacy D1 invitations remain accepted. See PAIRING_PROTOCOL.md for the design, entropy accounting and rollout requirements. The previously pending 0.6 features are included in this release; npm 0.6 publication was not completed.

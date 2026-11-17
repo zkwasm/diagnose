@@ -56,8 +56,8 @@ test('actual host survives probe and relay restarts, pauses access, and revokes 
   const until = async (predicate: () => boolean) => { for (let i = 0; i < 300 && !predicate(); i++) await new Promise(resolve => setTimeout(resolve, 20)); assert.ok(predicate(), output); };
   const stop = async () => { const ended = new Promise(resolve => child.once('exit', resolve)); if (child.pid) try { process.kill(-child.pid, 'SIGTERM'); } catch {} await ended; };
   try {
-    await until(() => /D1\.[A-Za-z0-9_-]{16}\.[A-Za-z0-9_-]{43}/.test(output));
-    const invitation = output.match(/D1\.[A-Za-z0-9_-]{16}\.[A-Za-z0-9_-]{43}/)![0];
+    await until(() => /\b[a-z]{3}-[a-z]{3}-[a-z]{3}\b/.test(output));
+    const invitation = output.match(/\b[a-z]{3}-[a-z]{3}-[a-z]{3}\b/)![0];
     peer = new Peer({ role: 'join', code: invitation, relay: url, label: 'Remembered support / test AI', remember: true }); await peer.open();
     const credential = peer.rememberedCode!; assert.ok(credential); assert.notEqual(credential, invitation);
     peer.close(); await until(() => output.includes('Waiting for connections'));

@@ -16,7 +16,7 @@ On the computer being diagnosed:
 npx @masstensor/diagnose@latest start
 ```
 
-Keep the terminal open and privately share its complete `D1.…` pairing code with the diagnostician.
+Keep the terminal open and privately share its nine-letter invitation, such as `abc-def-ghi`, with the diagnostician.
 
 On the diagnostician's computer, start an already installed and authenticated agent:
 
@@ -27,7 +27,7 @@ npx @masstensor/diagnose@latest agent codex
 
 The agent launcher requires **0.3.1+**. It loads Diagnose MCP for this launch without adding a permanent MCP entry. Tell the agent:
 
-> Use Diagnose to connect to this pairing code: D1.… . Help resolve the user's application startup failure. First investigate without changing anything. Explain the cause, proposed fix, and risks. Apply only authorized changes, then check whether the application starts successfully and report anything still unresolved.
+> Use Diagnose to connect to this pairing code: abc-def-ghi . Help resolve the user's application startup failure. First investigate without changing anything. Explain the cause, proposed fix, and risks. Apply only authorized changes, then check whether the application starts successfully and report anything still unresolved.
 
 The user must approve the connection locally. They choose per-task approval or automatic execution **and transmission** for this temporary session. Possessing a pairing code does not establish the diagnostician's real identity.
 
@@ -39,6 +39,8 @@ diagnose start
 # On the diagnostician's machine:
 diagnose agent codex
 ```
+
+Short invitations require **0.7.0+ on both endpoints** and the updated relay. They last 30 minutes, tolerate case/spaces/hyphens, and still require local approval. Existing remembered pairings remain valid. See the [protocol design](PAIRING_PROTOCOL.md).
 
 ## Pair once, return later
 

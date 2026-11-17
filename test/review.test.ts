@@ -67,6 +67,7 @@ for (const overwrite of [false, true]) test(`download protects concurrent local 
 });
 
 class FixturePeer extends EventEmitter {
+  readonly active = Promise.resolve();
   response?: (value: WireMessage) => void;
   async send(value: WireMessage) { this.response?.(value); }
   close(reason: string) { this.emit('closed', reason); }

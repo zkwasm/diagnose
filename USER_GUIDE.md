@@ -65,7 +65,7 @@ Then run this on the on-site computer:
 npx @masstensor/diagnose@latest start
 ```
 
-If npm asks to install the package, type `y`. Keep this terminal open. Send the complete `D1.…` code privately to your diagnostician.
+If npm asks to install the package, type `y`. Keep this terminal open. Send the nine-letter invitation, such as `abc-def-ghi`, privately to your diagnostician.
 
 ### 3. On the diagnostician's computer
 
@@ -76,7 +76,7 @@ npx @masstensor/diagnose@latest agent codex
 
 In the agent conversation, provide the code, device model, connection method, and a concrete goal:
 
-> Use Diagnose to connect to this code: D1.… . The on-site laptop is connected to an OWON SEG-X3-C gateway through its exposed USB serial interface. The gateway is online, but no plug readings are arriving. Inspect the available logs and identify the cause. Explain any proposed repair, apply only authorized changes, and check whether readings resume. If the interface does not support a required action, tell us what is needed on site.
+> Use Diagnose to connect to this code: abc-def-ghi . The on-site laptop is connected to an OWON SEG-X3-C gateway through its exposed USB serial interface. The gateway is online, but no plug readings are arriving. Inspect the available logs and identify the cause. Explain any proposed repair, apply only authorized changes, and check whether readings resume. If the interface does not support a required action, tell us what is needed on site.
 
 ### 4. Approve, diagnose, and finish
 
@@ -209,7 +209,7 @@ npm install -g @masstensor/diagnose@latest
 diagnose start
 ```
 
-The terminal shows a pairing code beginning with `D1.` and the local audit log path. Keep it open. Share the **complete code privately** with the intended diagnostician. The initial invitation lasts 10 minutes. Treat the code as a secret; do not post it publicly or place it in shell arguments.
+With v0.7+, the terminal shows a **nine-letter invitation**, such as `abc-def-ghi`, and the audit log path. Keep it open. Share the code privately by message or read it aloud. It lasts **30 minutes** and is consumed by successful pairing. Case, spaces and hyphens do not matter when entering it. The user must still approve locally. Treat the code as a secret; do not post it publicly or put it in shell arguments. After expiry or five attempted handshakes, the running probe generates a new code.
 
 The probe will show the connecting party's self-reported label and the session fingerprint. Check these with the intended diagnostician before accepting. A code proves possession of the secret, not a person's identity.
 
@@ -235,7 +235,7 @@ Do **not** separately run `diagnose mcp` or register a global MCP server. The la
 
 Then tell the agent what to inspect and provide the pairing code in the agent conversation. For example:
 
-> Use Diagnose to connect to pairing code D1.… . Help resolve the user's application startup failure. First investigate without changing anything. Explain the cause, proposed fix, and risks. Apply only authorized changes, then check whether the application starts successfully. Summarize what changed and anything still unresolved.
+> Use Diagnose to connect to pairing code abc-def-ghi . Help resolve the user's application startup failure. First investigate without changing anything. Explain the cause, proposed fix, and risks. Apply only authorized changes, then check whether the application starts successfully. Summarize what changed and anything still unresolved.
 
 The code and diagnostic results enter your chosen AI provider's context. The user must still accept the connection on their own computer. Ask the agent to use the `diagnose_*` tools for remote actions: its normal shell and file tools still act on the diagnostician's computer.
 
@@ -466,6 +466,10 @@ This is portable Markdown task loading, not native installation of a Codex, Clau
 
 With `--skill`, use native startup flags such as `--model` after `--`; do not also supply a separate prompt, headless prompt option, resume command, or another CLI subcommand. Gemini explicitly rejects a second prompt option. Use the normal launcher without `--skill` for those other modes.
 
+### Short invitation compatibility
+
+Nine-letter invitations require **0.7.0+ on both computers** and an updated relay. The latest client also accepts legacy `D1` codes from older probes. Existing remembered pairings keep working without a new code. The 30-minute invitation deadline is separate from diagnostic session idle/total timeouts, which begin after pairing. Knowledge-library recovery files remain long private credentials; do not shorten them or use them as pairing codes.
+
 ### Session configuration and extra arguments
 
 ```sh
@@ -607,7 +611,7 @@ For download resume, keep the partial file and sidecar together. Upload resume u
 
 | Limit | Default / maximum |
 | --- | --- |
-| Invitation | 10 minutes |
+| New short invitation | 30 minutes; one-time; up to five attempted handshakes |
 | Temporary session idle / total | 10 minutes / 60 minutes by default |
 | Remembered pairing | Until revoked locally; requires the foreground probe |
 | Remembered automatic grant | 1 hour, or until locally revoked if explicitly chosen |
@@ -650,7 +654,7 @@ The direct commands accept an optional relay URL, for example `diagnose start ht
 Remembered pairing credentials and policy are stored encrypted under `~/.diagnose/pairings`, with a local key in that protected directory (directory `0700`, files `0600` where supported). This protects stored contents from casual access, not a compromised OS account or a backup containing both ciphertext and key. Possession of a relationship credential authenticates that relationship, not a person’s legal identity. Revocation removes the user-side credential and terminates access. Stable relay routing identifiers can correlate repeated connections; the relay still sees connection metadata.
 
 
-Diagnose uses Noise `NNpsk0_25519_ChaChaPoly_BLAKE2b`, a random 256-bit pairing secret, ephemeral X25519 keys, independent direction counters, and routing/role/version binding. Tests include a public Cacophony test vector. Each direction is limited to one million frames, below the dependency's 32-bit counter boundary. WSS also validates the relay certificate. No independent security audit has been completed.
+Short invitations use OPAQUE between the two endpoints to derive a strong Noise PSK. Only a two-letter locator reaches the relay; the other seven random letters remain the PAKE secret. The probe itself enforces expiry and attempt limits. Remembered relationships and legacy D1 invitations use independent random 256-bit secrets. The transport uses Noise `NNpsk0_25519_ChaChaPoly_BLAKE2b`, ephemeral X25519 keys, independent direction counters, and routing/role/version binding. See the [short invitation protocol](https://github.com/zkwasm/diagnose/blob/main/PAIRING_PROTOCOL.md) for the exact design and limits. Tests include a public Cacophony test vector. Each direction is limited to one million frames, below the dependency's 32-bit counter boundary. WSS also validates the relay certificate. No independent security audit has been completed.
 
 The relay keeps rooms and ciphertext buffers in memory. It does not persist diagnostic contents, endpoint decryption keys, or offline messages. It can see IP addresses, routing identifiers, connection timing, and traffic volume, and can deny service. A self-reported label is not verified identity.
 

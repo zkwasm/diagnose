@@ -1,8 +1,21 @@
-import { randomBytes, createHash } from 'node:crypto';
+import { randomBytes, randomInt, createHash } from 'node:crypto';
 import Noise from 'noise-handshake';
 import Cipher from 'noise-handshake/cipher.js';
 
 export const NOISE_PROTOCOL = 'Noise_NNpsk0_25519_ChaChaPoly_BLAKE2b';
+export const INVITATION_MS = 30 * 60 * 1000;
+export function createInvitation(): string {
+  const letters = Array.from({ length: 9 }, () => String.fromCharCode(97 + randomInt(26))).join('');
+  return letters.match(/.{3}/g)!.join('-');
+}
+export function parseInvitation(code: string): { room: string; secret: Buffer; short: boolean } {
+  if (code.trim().startsWith('D1.')) return { ...parseCode(code), short: false };
+  const letters = code.replace(/[\s-]/g, '').toLowerCase();
+  if (!/^[a-z]{9}$/.test(letters)) throw new Error('Enter the nine-letter invitation, for example abc-def-ghi');
+  // Only the public two-letter locator reaches the relay. Never hash the full
+  // code into a public locator: that would permit offline password guessing.
+  return { room: `S2.${letters.slice(0, 2)}`, secret: Buffer.from(letters.slice(2)), short: true };
+}
 export function createCode(): string { return `D1.${randomBytes(12).toString('base64url')}.${randomBytes(32).toString('base64url')}`; }
 export function parseCode(code: string): { room: string; secret: Buffer } {
   const match = /^D1\.([A-Za-z0-9_-]{16})\.([A-Za-z0-9_-]{43})$/.exec(code.trim());

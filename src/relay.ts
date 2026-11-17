@@ -2,10 +2,11 @@ import http from 'node:http';
 import { createReadStream, statSync } from 'node:fs';
 import { WebSocket, WebSocketServer } from 'ws';
 import { MAX_FRAME } from './schema.js';
+import { INVITATION_MS } from './crypto.js';
 import { VaultServer } from './vault-server.js';
 
 export type RelayOptions = { host?: string; port?: number; invitationMs?: number; sessionMs?: number; maxRooms?: number; downloadPath?: string; vaultPath?: string; observeCiphertext?: (bytes: Buffer) => void };
-type Room = { host: WebSocket; peer?: WebSocket; locked: boolean; attempts: number; expires: number; frames: number; window: number };
+type Room = { short: boolean; host: WebSocket; peer?: WebSocket; locked: boolean; attempts: number; expires: number; frames: number; window: number };
 const control = (ws: WebSocket, type: string, extra = {}): void => { if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type, ...extra })); };
 
 export function createRelay(options: RelayOptions = {}) {
@@ -13,6 +14,7 @@ export function createRelay(options: RelayOptions = {}) {
   const rooms = new Map<string, Room>();
   const clients = new Map<WebSocket, { role?: 'host' | 'join'; room?: string; ip: string; alive: boolean }>();
   const connectionsByIp = new Map<string, number>();
+  const connectionRates = new Map<string, { since: number; count: number }>();
   const server = http.createServer((req, res) => {
     res.setHeader('Cache-Control', 'no-store');
     res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -33,6 +35,11 @@ export function createRelay(options: RelayOptions = {}) {
   wss.on('connection', (ws, req) => {
     const direct = req.socket.remoteAddress ?? 'unknown';
     const ip = ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(direct) ? String(req.headers['x-forwarded-for'] ?? direct).split(',')[0].trim() : direct;
+    const now = Date.now();
+    for (const [key, rate] of connectionRates) if (now - rate.since > 60000) connectionRates.delete(key);
+    const rate = connectionRates.get(ip) ?? { since: now, count: 0 };
+    if ((!connectionRates.has(ip) && connectionRates.size >= 10000) || ++rate.count > 60) { ws.close(1008, 'Connection rate limit'); return; }
+    connectionRates.set(ip, rate);
     if ((connectionsByIp.get(ip) ?? 0) >= 30) { ws.close(1008, 'Connection limit'); return; }
     connectionsByIp.set(ip, (connectionsByIp.get(ip) ?? 0) + 1);
     const state = { ip, alive: true } as { role?: 'host' | 'join'; room?: string; ip: string; alive: boolean };
@@ -46,21 +53,23 @@ export function createRelay(options: RelayOptions = {}) {
         if (!state.role) {
           if (binary || bytes.length > 256) throw new Error();
           const msg = JSON.parse(bytes.toString());
-          if (msg.version !== 1 || !/^[A-Za-z0-9_-]{16}$/.test(msg.room) || !['host', 'join'].includes(msg.role)) throw new Error();
+          const short = msg.version === 2 && /^S2\.[a-z]{2}$/.test(msg.room);
+          if (!(short || (msg.version === 1 && /^[A-Za-z0-9_-]{16}$/.test(msg.room))) || !['host', 'join'].includes(msg.role)) throw new Error();
           if (msg.role === 'host') {
+            if (short && rooms.has(msg.room)) { ws.close(1008, 'Invitation locator occupied'); return; }
             if (rooms.has(msg.room) || rooms.size >= (options.maxRooms ?? 100)) throw new Error();
-            rooms.set(msg.room, { host: ws, locked: false, attempts: 0, expires: Date.now() + (options.invitationMs ?? 600000), frames: 0, window: Date.now() });
+            rooms.set(msg.room, { short, host: ws, locked: false, attempts: 0, expires: Date.now() + (short ? Math.min(options.invitationMs ?? INVITATION_MS, INVITATION_MS) : options.invitationMs ?? 600000), frames: 0, window: Date.now() });
             state.role = 'host'; state.room = msg.room; control(ws, 'registered');
           } else {
             const room = rooms.get(msg.room);
-            if (!room || room.locked || room.peer || room.attempts >= 10 || room.expires < Date.now()) throw new Error();
+            if (!room || room.locked || room.peer || room.attempts >= (room.short ? 5 : 10) || room.expires < Date.now()) throw new Error();
             state.role = 'join'; state.room = msg.room; room.peer = ws; room.attempts++;
             control(room.host, 'peer'); control(ws, 'joined');
           }
           clearTimeout(registration); return;
         }
         const room = rooms.get(state.room!);
-        if (!room) throw new Error();
+        if (!room || room.expires < Date.now()) throw new Error();
         if (binary) {
           if (Date.now() - room.window > 1000) { room.window = Date.now(); room.frames = 0; }
           if (++room.frames > 250 || bytes.length > MAX_FRAME) throw new Error();

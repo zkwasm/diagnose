@@ -17,7 +17,7 @@ test('actual host CLI displays and enforces pairing, execution and transfer prom
   let codeResolve!: (value: string) => void;
   const code = new Promise<string>(resolve => { codeResolve = resolve; });
   child.stdout.on('data', bytes => {
-    text += bytes.toString(); const match = /D1\.[A-Za-z0-9_-]{16}\.[A-Za-z0-9_-]{43}/.exec(text); if (match) codeResolve(match[0]);
+    text += bytes.toString(); const match = /\b[a-z]{3}-[a-z]{3}-[a-z]{3}\b/.exec(text); if (match) codeResolve(match[0]);
     if (!pairing && text.includes('Allow this temporary diagnostic session?')) { pairing = true; child.stdin.write('y\n'); }
     if (!executing && text.includes('Allow exactly this operation?')) { executing = true; child.stdin.write('y\n'); }
     if (!sending && text.includes('Send these results (')) { sending = true; child.stdin.write('y\n'); }
@@ -39,7 +39,7 @@ test('host CLI auto selection skips task prompts, can revoke, and requires local
   const code = new Promise<string>(resolve => { resolveCode = resolve; });
   child.stderr.resume();
   child.stdout.on('data', bytes => {
-    output += bytes.toString(); const match = /D1\.[A-Za-z0-9_-]{16}\.[A-Za-z0-9_-]{43}/.exec(output); if (match) resolveCode(match[0]);
+    output += bytes.toString(); const match = /\b[a-z]{3}-[a-z]{3}-[a-z]{3}\b/.exec(output); if (match) resolveCode(match[0]);
     if (!paired && output.includes('Allow this temporary diagnostic session?')) { paired = true; child.stdin.write('a\n'); }
     const executionCount = output.split('Allow exactly this operation?').length - 1;
     if (executionCount > executionPrompts) { executionPrompts = executionCount; child.stdin.write('n\n'); }
@@ -75,7 +75,7 @@ test('host CLI re-pairs after disconnect and resumes retained process without re
   const childHome = mkdtempSync(join(tmpdir(), 'diagnose-repair-')), relay = createRelay({ port: 0 }), url = `ws://127.0.0.1:${await relay.listen()}`;
   const child = spawn('/bin/sh', ['-c', 'cat | /usr/bin/script -q /dev/null "$@"', 'repair-test', process.execPath, 'dist/cli.js', 'start', url], { detached: true, env: { ...process.env, HOME: childHome }, stdio: ['pipe', 'pipe', 'pipe'] });
   let output = '', approvals = 0; child.stderr.resume(); child.stdout.on('data', bytes => { output += bytes.toString(); const count = output.split('Allow this temporary diagnostic session?').length - 1; if (count > approvals) { approvals = count; child.stdin.write('a\n'); } });
-  const codes = () => [...new Set(output.match(/D1\.[A-Za-z0-9_-]{16}\.[A-Za-z0-9_-]{43}/g) ?? [])];
+  const codes = () => [...new Set(output.match(/\b[a-z]{3}-[a-z]{3}-[a-z]{3}\b/g) ?? [])];
   const until = async (predicate: () => boolean) => { for (let n = 0; n < 200 && !predicate(); n++) await new Promise(resolve => setTimeout(resolve, 20)); assert.ok(predicate(), output); };
   let peer: Peer | undefined;
   try {

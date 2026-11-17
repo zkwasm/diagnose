@@ -13,7 +13,7 @@ import { safeText } from './util.js';
 import { registerKnowledge } from './knowledge-mcp.js';
 
 export async function serveMcp(relay: string, device?: string, caseId?: string): Promise<void> {
-  const server = new McpServer({ name: 'diagnose', version: '0.6.0' });
+  const server = new McpServer({ name: 'diagnose', version: '0.7.0' });
   let operator: Operator | undefined;
   let remembered = device ? new RememberedConnection(new PairingStore().get(device, 'operator')) : undefined;
   const transfers = new Map<string, { progress: TransferProgress; controller: AbortController }>(), forwards = new Map<string, Forward>();
@@ -23,7 +23,7 @@ export async function serveMcp(relay: string, device?: string, caseId?: string):
   const observed = new WeakSet<Operator>();
   const attach = (value: Operator) => { value.observe = knowledge.observe; if (!observed.has(value)) { observed.add(value); value.peer.once('closed', () => { connectionState = 'disconnected'; if (operator === value) operator = undefined; }); } connectionState = 'connected'; return value; };
   const connected = async (): Promise<Operator> => { try { if (remembered) return attach(await remembered.connect()); if (!operator) throw new Error('Pair first, or launch with --device NAME'); return attach(operator); } catch (error) { connectionState = 'unavailable'; throw error; } };
-  server.registerTool('diagnose_pair', { description: 'Connect using the full user-shared code. The user must confirm locally. Label is self-asserted; identify the AI/provider handling results.', inputSchema: { code: z.string(), label: z.string().min(1).max(120) } }, async ({ code, label }) => {
+  server.registerTool('diagnose_pair', { description: 'Connect using the user-shared nine-letter invitation (abc-def-ghi; case, spaces and hyphens ignored). Legacy D1 codes are also accepted. The user must confirm locally. Label is self-asserted; identify the AI/provider handling results.', inputSchema: { code: z.string(), label: z.string().min(1).max(120) } }, async ({ code, label }) => {
     if (operator || remembered) throw new Error('Disconnect the current session first');
     const peer = new Peer({ relay, code, role: 'join', label }); const candidate = new Operator(peer);
     try { await peer.open(); operator = attach(candidate); return answer({ connected: true, fingerprint: peer.fingerprint }); } catch (error) { peer.close(); connectionState = 'unavailable'; throw error; }

@@ -11,6 +11,7 @@ export function safeText(text: string): string {
 export function redact(text: string): string {
   return safeText(text)
     .replace(/("?(?:password|passwd|pswd|secret|token|session|authorization|api[_-]?key)"?\s*[:=]\s*)(?:"[^"\r\n]*"|'[^'\r\n]*'|[^\s,}\r\n]+)/gi, '$1[REDACTED]')
+    .replace(/\b[a-z]{3}-[a-z]{3}-[a-z]{3}\b/gi, '[INVITATION CODE]')
     .replace(/\bD1\.[A-Za-z0-9_-]{16}\.[A-Za-z0-9_-]{43}\b/g, '[PAIRING CODE]')
     .replace(/\b[a-f0-9]{32,}\b/gi, '[REDACTED]')
     .replace(/-----BEGIN [^-]*PRIVATE KEY-----[\s\S]*?-----END [^-]*PRIVATE KEY-----/g, '[PRIVATE KEY]');

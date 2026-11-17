@@ -1,6 +1,6 @@
 {
   "name": "@masstensor/diagnose",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "Agent-led remote troubleshooting and problem resolution, with end-to-end encryption and user-controlled permissions",
   "type": "module",
   "license": "MIT",
@@ -31,7 +31,8 @@
     "scripts/setup-node.sh",
     "scripts/setup-node.ps1",
     "KNOWLEDGE_SECURITY.md",
-    "DEVELOPMENT_PLAN.md"
+    "DEVELOPMENT_PLAN.md",
+    "PAIRING_PROTOCOL.md"
   ],
   "scripts": {
     "build": "tsc",
@@ -46,6 +47,7 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.32.2",
+    "@serenity-kit/opaque": "1.1.0",
     "node-pty": "1.1.0",
     "noise-handshake": "4.2.1",
     "serialport": "13.0.0",

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { createInterface } from 'node:readline/promises';
 import { stdin, stdout } from 'node:process';
-import { createCode } from './crypto.js';
+import { createCode, createInvitation } from './crypto.js';
 import { Peer } from './peer.js';
 import { ProbeEngine } from './engine.js';
 import { Operator } from './operator.js';
@@ -75,7 +75,7 @@ async function main(): Promise<void> {
       let remembered: import('./pairing.js').Pairing | undefined = store.list('host')[0];
       if (remembered?.paused) { console.log('Remote access is paused. Type resume, unpair, or exit.'); const controls = (line: string) => { if (line.trim() === 'resume') { remembered!.paused = false; store.save(remembered!); firstAudit.record('pairing.resume', { id: remembered!.id }); } else if (line.trim() === 'unpair') { store.remove(remembered!.id); firstAudit.record('pairing.revoked', { id: remembered!.id }); remembered = undefined; } else if (line.trim() === 'permissions ask') { remembered!.autoUntil = 0; store.save(remembered!); firstAudit.record('permissions.revoked', { id: remembered!.id }); console.log('Automatic permissions revoked; access remains paused.'); } else if (line.trim() === 'exit') stop(); else console.log('Access paused. Type resume, unpair, permissions ask, or exit.'); }; rl.on('line', controls); try { while (remembered?.paused && !shutdown.signal.aborted) { await delay(300, undefined, { signal: shutdown.signal }).catch(() => {}); remembered = store.list('host')[0]; } } finally { rl.off('line', controls); } }
       if (shutdown.signal.aborted) break;
-      const audit = sessions++ === 0 ? firstAudit : new Audit(); const code = remembered?.code ?? createCode(); let provision: string | undefined;
+      const audit = sessions++ === 0 ? firstAudit : new Audit(); const code = remembered?.code ?? createInvitation(); let provision: string | undefined;
       let grantTimer: NodeJS.Timeout | undefined;
       peer = new Peer({ role: 'host', code, relay: remembered?.relay ?? relay, sessionMs: remembered ? 0 : sessionMinutes * 60000, provision: () => provision, accept: async ({ label, fingerprint, signal, remember }) => {
         if (remembered) { audit.record('pairing.reconnected', { id: remembered.id }); return !remembered.paused; }
@@ -135,9 +135,9 @@ async function main(): Promise<void> {
       rl.on('line', onLocalLine);
       try {
         await peer.open();
-        console.log(remembered ? `Remembered diagnostician: ${safeText(remembered.label)}. Waiting for connections. Local commands: pairing, pause, resume, unpair, permissions ask, permissions auto [forever], cancel, jobs, exit. Audit: ${audit.path}` : `Relay: ${relay}\nAudit: ${audit.path}\nPairing code (10 minutes, share privately):\n${code}\nCtrl+C ends the session and cancels active tasks.`);
+        console.log(remembered ? `Remembered diagnostician: ${safeText(remembered.label)}. Waiting for connections. Local commands: pairing, pause, resume, unpair, permissions ask, permissions auto [forever], cancel, jobs, exit. Audit: ${audit.path}` : `Relay: ${relay}\nAudit: ${audit.path}\nPairing code (30 minutes, one-time, share privately):\n${code}\nCtrl+C ends the session and cancels active tasks.`);
         console.log(`Session ended: ${safeText(await peer.ended)}`);
-      } catch (error) { if (!shutdown.signal.aborted) console.log(`Relay unavailable: ${safeText((error as Error).message)}. Retained work remains local; retrying in 3 seconds.`); await delay(3000, undefined, { signal: shutdown.signal }).catch(() => {}); }
+      } catch (error) { const collision = (error as Error).message.includes('Invitation locator occupied'); if (!shutdown.signal.aborted) console.log(collision ? 'Choosing another invitation code...' : `Relay unavailable: ${safeText((error as Error).message)}. Retained work remains local; retrying in 3 seconds.`); await delay(collision ? 100 : 3000, undefined, { signal: shutdown.signal }).catch(() => {}); }
       finally { clearTimeout(grantTimer); rl.off('line', onLocalLine); }
       active = false; if (secretPending) await secretPending;
       if (!shutdown.signal.aborted) { console.log('Probe is still running. Remembered pairing survives reconnects; commands are never replayed. Ctrl+C stops access and closes resources; trust remains until unpair.'); await delay(300, undefined, { signal: shutdown.signal }).catch(() => {}); }

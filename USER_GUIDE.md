@@ -146,6 +146,59 @@ Then tell the agent what to inspect and provide the pairing code in the agent co
 
 The code and diagnostic results enter your chosen AI provider's context. The user must still accept the connection on their own computer. Ask the agent to use the `diagnose_*` tools for remote actions: its normal shell and file tools still act on the diagnostician's computer.
 
+### Keep a device paired for future diagnosis
+
+Requires **0.5.0+ on both computers**. Use this when the same diagnostician will return later. The user starts the probe as usual and shares the temporary code privately. On the diagnostician's computer, pair once:
+
+```sh
+diagnose pair --name alice-pc
+# Enter the user's code, then your label and AI provider when prompted.
+```
+
+The user's terminal explicitly asks whether to **remember** this diagnostician. Check the label and fingerprint with each other before agreeing. Choose `y` to remember the relationship with per-task approval, or `a` to also grant automatic execution **and transmission for one hour**. The invitation is replaced by a new random private credential exchanged only inside the approved encrypted connection. Neither side prints that credential or sends it in process arguments. Each later connection has a fresh Noise handshake and encryption keys.
+
+After pairing, the diagnostician can start, stop, and restart any supported agent using the same device name:
+
+```sh
+diagnose agent codex --device alice-pc --skill ./devices/owon.md
+diagnose agent claude --device alice-pc --skill ./devices/owon.md
+diagnose agent gemini --device alice-pc --skill ./devices/owon.md
+# --skill is optional.
+```
+
+Tell the agent what problem to resolve and to use Diagnose. The MCP tools connect to the saved device when first used; no pairing code is needed. The device name identifies the user's computer, not a particular USB device. The selected task can identify the actual device to investigate. Each agent still uses its own login and local tool permissions.
+
+Keep `diagnose start` running on the user's computer. It re-registers with the relay after a dropped connection. If it is stopped or the computer restarts, run `diagnose start` again: the pairing and its saved permission expiry remain. This release does not install a background service or start at login. One probe accepts one remembered diagnostician at a time; a diagnostician can save multiple user computers. Use local `unpair` before pairing a different diagnostician.
+
+**Remembering is separate from automatic approval.** The default is still per-task approval. In the user's running probe terminal:
+
+| Command | Effect |
+| --- | --- |
+| `pairing` | Show the remembered diagnostician and automatic grant expiry. |
+| `permissions auto`, then `permissions allow-auto` | Grant one hour of automatic execution and transmission, across reconnects and restarts. |
+| `permissions auto forever`, then `permissions allow-auto` | Explicitly grant automatic execution and transmission until revoked locally. |
+| `permissions ask` | Revoke automatic permission, cancel work/resources, keep the pairing. |
+| `pause` | Disconnect and block access while retaining the pairing and its original grant expiry. |
+| `resume` | Allow connections again. An expired grant does not become valid again. |
+| `unpair` | Revoke the private credential, cancel work/resources, and return to a new invitation. |
+| `exit` or `Ctrl+C` | Stop access and close resources. Remembered pairing remains for the next start. |
+
+Time disconnected counts toward a timed grant. Restarting an agent, probe, or relay does not renew it. Pausing does not extend it. The remote agent cannot change this policy. A continuously authorized diagnostician still has the user's OS permissions; results may reach their AI provider.
+
+On the diagnostician's computer:
+
+```sh
+diagnose devices
+diagnose connect --device alice-pc
+diagnose terminal --device alice-pc
+diagnose mcp --device alice-pc
+diagnose forget --device alice-pc
+```
+
+`devices` lists local pairings, not live online status. `forget` removes only the diagnostician's local copy. To invalidate a credential, the user must run `unpair` in their probe terminal. If initial pairing is interrupted before the diagnostician saves it, use `unpair` and pair again. Losing local pairing files requires pairing again.
+
+A new MCP operation will reconnect to a remembered device for up to 30 seconds if needed. **No already-sent command, input, upload commit, or other modification is automatically retried.** An interrupted task can have an uncertain outcome; inspect state before retrying. Old task IDs are not carried into a new connection. Retained resources require their original resource ID, recovery credential, and authorization; see [Disconnect and recover](#6-disconnect-and-recover).
+
 ## Start with a device skill or Markdown task
 
 Version **0.4.0+** can start the agent with a selected diagnostic procedure. The syntax is identical for all three agents:
@@ -338,7 +391,7 @@ SOCKS defaults to `allowedHosts:["*"]`, which permits any target. Narrow it when
 
 ## 6. Disconnect and recover
 
-When a connection drops, finite jobs are cancelled and serial handles close. The user's probe stays running and displays a **new pairing code**. Pair again, obtain new local consent, then resume a retained resource using its original ID and recovery credential. Diagnose never silently replays a creation command.
+When a connection drops, finite jobs are cancelled and serial handles close. With a remembered pairing, the probe stays available and the next new MCP operation reconnects without another code. For temporary sessions, the probe displays a new code and requires local connection consent again. Resume retained resources explicitly using their original IDs and recovery credentials. Diagnose never silently replays a creation command.
 
 Ordinary live processes default to `retainOnDisconnect:false`; file transfers default to retained. A retained live process survives network loss only while the original probe process remains running. If the probe itself disappears, a new probe can recover encrypted saved output and supported file staging, but cannot take over the old process's PTY. Network connections must be recreated.
 
@@ -349,7 +402,9 @@ For download resume, keep the partial file and sidecar together. Upload resume u
 | Limit | Default / maximum |
 | --- | --- |
 | Invitation | 10 minutes |
-| Idle session / total session | 10 minutes / 60 minutes by default |
+| Temporary session idle / total | 10 minutes / 60 minutes by default |
+| Remembered pairing | Until revoked locally; requires the foreground probe |
+| Remembered automatic grant | 1 hour, or until locally revoked if explicitly chosen |
 | Finite command or script | 60 seconds by default; 300 seconds maximum |
 | Batch | Up to 32 steps; 300 seconds; 10 MiB combined output |
 | Concurrent finite jobs | 4 |
@@ -362,7 +417,7 @@ For download resume, keep the partial file and sidecar together. Upload resume u
 diagnose start --session-minutes 240 --idle-minutes 30
 ```
 
-Set a session or idle timeout to `0` to disable that endpoint timer; relay and cipher limits still apply. Both endpoints should use a compatible current version. POSIX processes that deliberately detach from their process group cannot always be terminated by group cancellation.
+Session and idle options apply to temporary connections. Remembered connections disable these endpoint timers, while automatic approval has its own saved expiry. Set a temporary session or idle timeout to `0` to disable that endpoint timer; relay and cipher limits still apply. Both endpoints should use a compatible current version. POSIX processes that deliberately detach from their process group cannot always be terminated by group cancellation.
 
 ## 8. Manual operation and other MCP clients
 
@@ -385,6 +440,9 @@ This is a local child process, not a public HTTP MCP endpoint. Running `diagnose
 The direct commands accept an optional relay URL, for example `diagnose start https://your-relay.example` and `diagnose mcp https://your-relay.example`. Remote relays require HTTPS/WSS; HTTP/WS is allowed only for loopback testing.
 
 ## Security and local data
+
+Remembered pairing credentials and policy are stored encrypted under `~/.diagnose/pairings`, with a local key in that protected directory (directory `0700`, files `0600` where supported). This protects stored contents from casual access, not a compromised OS account or a backup containing both ciphertext and key. Possession of a relationship credential authenticates that relationship, not a person’s legal identity. Revocation removes the user-side credential and terminates access. Stable relay routing identifiers can correlate repeated connections; the relay still sees connection metadata.
+
 
 Diagnose uses Noise `NNpsk0_25519_ChaChaPoly_BLAKE2b`, a random 256-bit pairing secret, ephemeral X25519 keys, independent direction counters, and routing/role/version binding. Tests include a public Cacophony test vector. Each direction is limited to one million frames, below the dependency's 32-bit counter boundary. WSS also validates the relay certificate. No independent security audit has been completed.
 

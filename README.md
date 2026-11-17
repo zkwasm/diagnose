@@ -40,6 +40,19 @@ diagnose start
 diagnose agent codex
 ```
 
+## Pair once, return later
+
+Requires **0.5.0+ on both computers**. The user keeps `diagnose start` running. On the diagnostician's computer:
+
+```sh
+diagnose pair --name alice-pc
+# Enter the temporary code and your label/provider; user confirms remembering.
+diagnose agent codex --device alice-pc --skill ./devices/owon.md
+# Same options for claude or gemini; --skill is optional.
+```
+
+Restart the agent whenever needed without a new code. Pairing persists across probe restarts, but access requires the foreground probe. Task approval remains the default. The user may grant automatic execution and transmission for one hour, or explicitly until revoked. Local `pause`, `permissions ask`, and `unpair` control access. Interrupted modifications are never automatically replayed. See the [pairing guide](USER_GUIDE.md#keep-a-device-paired-for-future-diagnosis).
+
 ## Start with a device skill or Markdown task
 
 Requires **0.4.0+**. Use the same option with every supported agent:

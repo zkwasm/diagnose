@@ -4,7 +4,7 @@ import { Handshake, parseCode, type SecureCipher } from './crypto.js';
 import { CHUNK_SIZE, MAX_FRAME, parseMessage, type WireMessage } from './schema.js';
 import { safeText } from './util.js';
 
-export type PeerOptions = { role: 'host' | 'join'; code: string; relay: string; label?: string; accept?: (peer: { label: string; fingerprint: string; signal: AbortSignal }) => Promise<boolean>; approvalTimeoutMs?: number; sessionMs?: number };
+export type PeerOptions = { role: 'host' | 'join'; code: string; relay: string; label?: string; remember?: boolean; provision?: () => string | undefined; accept?: (peer: { label: string; fingerprint: string; signal: AbortSignal; remember: boolean }) => Promise<boolean>; approvalTimeoutMs?: number; sessionMs?: number };
 function deferred<T>() { let resolve!: (value: T) => void; let reject!: (error: Error) => void; const promise = new Promise<T>((a, b) => { resolve = a; reject = b; }); promise.catch(() => {}); return { promise, resolve, reject }; }
 export function relayUrl(value: string): string {
   const url = new URL(value);
@@ -39,6 +39,7 @@ export class Peer extends EventEmitter {
   private connectionTimer: NodeJS.Timeout;
   private handshakeTimer?: NodeJS.Timeout;
   fingerprint = '';
+  rememberedCode?: string;
 
   constructor(private options: PeerOptions) {
     super();
@@ -65,7 +66,7 @@ export class Peer extends EventEmitter {
       case 'joined':
         clearTimeout(this.connectionTimer); this.registered.resolve();
         this.handshake = new Handshake(true, this.room, this.secret);
-        this.ws.send(this.handshake.send(Buffer.from(JSON.stringify({ role: 'operator', label: (this.options.label ?? 'Diagnostic operator').slice(0, 120) }))));
+        this.ws.send(this.handshake.send(Buffer.from(JSON.stringify({ role: 'operator', label: (this.options.label ?? 'Diagnostic operator').slice(0, 120), ...(this.options.remember ? { remember: true } : {}) }))));
         this.handshakeTimer = setTimeout(() => this.close('Pairing or user approval timeout'), this.options.approvalTimeoutMs ?? 120000);
         break;
       case 'peer':
@@ -95,13 +96,13 @@ export class Peer extends EventEmitter {
         const timer = setTimeout(() => { this.approval?.abort(); this.close('Pairing approval timeout'); }, this.options.approvalTimeoutMs ?? 120000);
         this.handshakeTimer = timer;
         void (async () => {
-          const allowed = await this.options.accept?.({ label: safeText(hello.label), fingerprint: this.fingerprint, signal: this.approval!.signal });
+          const allowed = await this.options.accept?.({ label: safeText(hello.label), fingerprint: this.fingerprint, signal: this.approval!.signal, remember: hello.remember === true });
           clearTimeout(timer);
           if (this.destroyed || generation !== this.generation) return;
           if (!allowed || this.approval?.signal.aborted) { await this.send({ type: 'session.closed', reason: 'User declined pairing' }); this.close('User declined pairing'); return; }
           this.ws.send(JSON.stringify({ type: 'lock', ...(this.options.sessionMs === undefined ? {} : { ttlMs: this.options.sessionMs || 7 * 86400000 }) }));
           this.approved = true;
-          await this.send({ type: 'session.accepted', label: safeText(this.options.label ?? 'User probe'), fingerprint: this.fingerprint });
+          await this.send({ type: 'session.accepted', label: safeText(this.options.label ?? 'User probe'), fingerprint: this.fingerprint, ...(hello.remember === true && this.options.provision?.() ? { credential: this.options.provision!() } : {}) });
           this.activate();
         })().catch(() => this.close('Pairing approval failed'));
       } else {
@@ -119,6 +120,7 @@ export class Peer extends EventEmitter {
     if (message.type === 'session.closed') { this.close(message.reason); return; }
     if (message.type === 'session.accepted' && this.options.role === 'join' && !this.approved) {
       if (message.fingerprint !== this.fingerprint) throw new Error('Channel binding mismatch');
+      if (message.credential) { if (!this.options.remember) throw new Error('Unexpected pairing credential'); parseCode(message.credential); this.rememberedCode = message.credential; }
       clearTimeout(this.handshakeTimer); this.approved = true; this.activate(); return;
     }
     if (!this.approved) throw new Error('Not authorized');

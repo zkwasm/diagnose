@@ -5,17 +5,19 @@ import { tmpdir, homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
+import { PairingStore } from './pairing.js';
 import { loadSkill, skillPrompt } from './skill.js';
 
-export const agentUsage = 'diagnose agent codex|claude|gemini [--skill FILE.md|DIRECTORY] [--relay URL] [-- agent arguments...]';
+export const agentUsage = 'diagnose agent codex|claude|gemini [--device NAME] [--skill FILE.md|DIRECTORY] [--relay URL] [-- agent arguments...]';
 
 export async function launchAgent(argv: string[]): Promise<number> {
   const separator = argv.indexOf('--');
   const extra = separator < 0 ? [] : argv.slice(separator + 1);
-  const { positionals, values } = parseArgs({ args: separator < 0 ? argv : argv.slice(0, separator), allowPositionals: true, options: { relay: { type: 'string' }, skill: { type: 'string' }, help: { type: 'boolean', short: 'h' } } });
+  const { positionals, values } = parseArgs({ args: separator < 0 ? argv : argv.slice(0, separator), allowPositionals: true, options: { relay: { type: 'string' }, skill: { type: 'string' }, device: { type: 'string' }, help: { type: 'boolean', short: 'h' } } });
   if (values.help || !positionals.length) { console.log(agentUsage); return 0; }
   const [agent] = positionals;
   if (positionals.length !== 1 || !['codex', 'claude', 'gemini'].includes(agent)) throw new Error(agentUsage);
+  if (values.device) new PairingStore().get(values.device, 'operator');
   const skill = values.skill === undefined ? undefined : await loadSkill(values.skill);
   if (skill && agent === 'gemini' && extra.some(arg => ['-p', '--prompt', '-i', '--prompt-interactive'].includes(arg) || arg.startsWith('--prompt=') || arg.startsWith('--prompt-interactive='))) throw new Error('--skill supplies the initial task; do not also pass a Gemini prompt option');
   if (values.relay) {
@@ -24,7 +26,7 @@ export async function launchAgent(argv: string[]): Promise<number> {
     if (url.username || url.password) throw new Error('Relay URL must not contain credentials');
   }
   // Reuse this exact installed version. No global install or extra npx download.
-  const server = { command: process.execPath, args: [fileURLToPath(new URL('./cli.js', import.meta.url)), 'mcp', ...(values.relay ? [values.relay] : [])] };
+  const server = { command: process.execPath, args: [fileURLToPath(new URL('./cli.js', import.meta.url)), 'mcp', ...(values.relay ? [values.relay] : []), ...(values.device ? ['--device', values.device] : [])] };
   const env = { ...process.env }; let directory: string | undefined;
   try {
     let prompt: string | undefined, taskDirectory: string | undefined;
@@ -33,7 +35,7 @@ export async function launchAgent(argv: string[]): Promise<number> {
       taskDirectory = join(directory, 'task'); await mkdir(taskDirectory, { mode: 0o700 });
       const snapshot = join(taskDirectory, 'task.json');
       await writeFile(snapshot, JSON.stringify(skill), { mode: 0o600 });
-      prompt = skillPrompt(snapshot);
+      prompt = skillPrompt(snapshot) + (values.device ? '\nDiagnose MCP is already configured for the saved device ' + JSON.stringify(values.device) + '. Use its tools directly; do not ask for a pairing code. If unavailable, ask the user to start or resume their probe.' : '');
       console.error('Starting the selected skill. Its instructions and referenced data may be sent to your chosen AI provider. Remote pairing and existing permissions still apply.');
     }
     let args: string[];

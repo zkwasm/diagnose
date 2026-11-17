@@ -16,6 +16,7 @@ import { forward, type Forward } from './forward.js';
 import { spawn } from 'node:child_process';
 import { parseArgs } from 'node:util';
 import { setTimeout as delay } from 'node:timers/promises';
+import { PairingStore, automatic, RememberedConnection } from './pairing.js';
 import { launchAgent, agentUsage } from './agent.js';
 
 async function attachTerminal(operator: Operator, id: string): Promise<void> {
@@ -30,13 +31,15 @@ async function attachTerminal(operator: Operator, id: string): Promise<void> {
 
 async function main(): Promise<void> {
   if (process.argv[2] === 'agent') { process.exitCode = await launchAgent(process.argv.slice(3)); return; }
-  const { positionals, values } = parseArgs({ args: process.argv.slice(2), allowPositionals: true, options: { 'session-minutes': { type: 'string', default: '60' }, 'idle-minutes': { type: 'string', default: '10' } } });
+  const { positionals, values } = parseArgs({ args: process.argv.slice(2), allowPositionals: true, options: { 'session-minutes': { type: 'string', default: '60' }, 'idle-minutes': { type: 'string', default: '10' }, device: { type: 'string' }, name: { type: 'string' } } });
   const [command = 'help', relay = 'https://diagnose.fenginwind.com'] = positionals;
   if (positionals.length > 2) throw new Error('Usage: diagnose start|connect|terminal|mcp [relay-url]');
   const sessionMinutes = Number(values['session-minutes']), idleMinutes = Number(values['idle-minutes']);
   if (![sessionMinutes, idleMinutes].every(value => Number.isInteger(value) && value >= 0 && value <= 10080)) throw new Error('Timeouts must be 0..10080 minutes; 0 disables endpoint timeout (relay maximum 7 days)');
-  if (command === 'mcp') { await serveMcp(relay); return; }
-  if (!['start', 'connect', 'terminal'].includes(command)) { console.log(`diagnose start|connect|terminal|mcp [relay-url]\n${agentUsage}\nNode.js >=22.18. Pairing codes are entered interactively, never as arguments.`); return; }
+  if (command === 'devices') { console.log(JSON.stringify(new PairingStore(join(homedir(), '.diagnose', 'pairings')).list('operator').map(({ name, id, relay }) => ({ name, id, relay })), null, 2)); return; }
+  if (command === 'forget') { const store = new PairingStore(join(homedir(), '.diagnose', 'pairings')); store.remove(store.get(values.device ?? '', 'operator').id); console.log('Local pairing removed. Revoke on the user computer to invalidate its credential.'); return; }
+  if (command === 'mcp') { await serveMcp(relay, values.device); return; }
+  if (!['start', 'connect', 'terminal', 'pair'].includes(command)) { console.log(`diagnose start|connect|terminal|mcp [relay-url] [--device NAME]\ndiagnose pair [relay-url] --name NAME\ndiagnose devices\ndiagnose forget --device NAME\n${agentUsage}\nNode.js >=22.18. Pairing codes are entered interactively, never as arguments.`); return; }
   if (!stdin.isTTY || !stdout.isTTY) throw new Error('Interactive terminal required. AI clients should use diagnose mcp.');
   const rl = createInterface({ input: stdin, output: stdout });
   const shutdown = new AbortController(); let peer: Peer | undefined, engine: ProbeEngine | undefined;
@@ -56,33 +59,50 @@ async function main(): Promise<void> {
   };
   try {
     if (command === 'start') {
+      const store = new PairingStore();
       const firstAudit = new Audit(); resources = new SessionResources(join(homedir(), '.diagnose', 'resources'), firstAudit); let sessions = 0;
       while (!shutdown.signal.aborted) {
-      const audit = sessions++ === 0 ? firstAudit : new Audit(); const code = createCode();
-      peer = new Peer({ role: 'host', code, relay, sessionMs: sessionMinutes * 60000, accept: async ({ label, fingerprint, signal }) => {
+      let remembered: import('./pairing.js').Pairing | undefined = store.list('host')[0];
+      if (remembered?.paused) { console.log('Remote access is paused. Type resume, unpair, or exit.'); const controls = (line: string) => { if (line.trim() === 'resume') { remembered!.paused = false; store.save(remembered!); firstAudit.record('pairing.resume', { id: remembered!.id }); } else if (line.trim() === 'unpair') { store.remove(remembered!.id); firstAudit.record('pairing.revoked', { id: remembered!.id }); remembered = undefined; } else if (line.trim() === 'permissions ask') { remembered!.autoUntil = 0; store.save(remembered!); firstAudit.record('permissions.revoked', { id: remembered!.id }); console.log('Automatic permissions revoked; access remains paused.'); } else if (line.trim() === 'exit') stop(); else console.log('Access paused. Type resume, unpair, permissions ask, or exit.'); }; rl.on('line', controls); try { while (remembered?.paused && !shutdown.signal.aborted) { await delay(300, undefined, { signal: shutdown.signal }).catch(() => {}); remembered = store.list('host')[0]; } } finally { rl.off('line', controls); } }
+      if (shutdown.signal.aborted) break;
+      const audit = sessions++ === 0 ? firstAudit : new Audit(); const code = remembered?.code ?? createCode(); let provision: string | undefined;
+      let grantTimer: NodeJS.Timeout | undefined;
+      peer = new Peer({ role: 'host', code, relay: remembered?.relay ?? relay, sessionMs: remembered ? 0 : sessionMinutes * 60000, provision: () => provision, accept: async ({ label, fingerprint, signal, remember }) => {
+        if (remembered) { audit.record('pairing.reconnected', { id: remembered.id }); return !remembered.paused; }
+        if (remember) console.log('REMEMBER THIS DIAGNOSTICIAN: this computer will accept future connections using a new private credential until you type "unpair". Task approval remains enabled. AUTO lasts one hour, across reconnects.');
         console.log(`\nRequested by: ${safeText(label)} (self-asserted identity)\nFingerprint: ${fingerprint}\nResults will be available to the diagnostician and their AI provider.`);
-        console.log('Choose y: approve each task/batch and its transfer.\nChoose a: grant automatic execution AND transmission for this temporary session.\nAUTO: commands have your OS permissions; results go to the diagnostician and their AI without further prompts. Raw terminal, file and tunnel channels are NOT redacted. A channel grant includes continuing input/output within its scope.\nRevoke locally with "permissions ask", cancel with "cancel", or end with Ctrl+C. Already transmitted data cannot be recalled.');
-        const answer = (await rl.question('Allow this temporary diagnostic session? [y / a=auto / N] ', { signal })).trim().toLowerCase();
+        console.log('Choose y: approve each task/batch and its transfer.\nChoose a: grant automatic execution AND transmission (one hour if remembered; otherwise this temporary session).\nAUTO: commands have your OS permissions; results go to the diagnostician and their AI without further prompts. Raw terminal, file and tunnel channels are NOT redacted. A channel grant includes continuing input/output within its scope.\nRevoke locally with "permissions ask", cancel with "cancel", or end with Ctrl+C. Already transmitted data cannot be recalled.');
+        const answer = (await rl.question(remember ? 'Remember and allow this diagnostician? [y / a=auto for 1 hour / N] ' : 'Allow this temporary diagnostic session? [y / a=auto / N] ', { signal })).trim().toLowerCase();
         const allowed = answer === 'y' || answer === 'a';
-        if (answer === 'a') engine!.setPermissionMode('auto');
+        if (allowed && remember) { provision = createCode(); remembered = store.add({ role: 'host', name: 'diagnostician', label, relay, code: provision }); audit.record('pairing.remembered', { id: remembered.id }); }
+        if (answer === 'a') { engine!.setPermissionMode('auto'); if (remembered) { remembered.autoUntil = Date.now() + 3600000; store.save(remembered); scheduleGrant(); } }
         audit.record('session.pairing-decision', { allowed, fingerprint }); return allowed;
       } });
       engine = new ProbeEngine(peer, async request => {
         console.log(`\n[${request.stage === 'execute' ? 'EXECUTION APPROVAL' : 'TRANSFER APPROVAL'}] ${request.task.operation}\nTask: ${request.task.id}\nSHA256: ${request.digest}\n${safeText(request.preview)}\n`);
         return ask(request.stage === 'execute' ? 'Allow exactly this operation? Commands run with your OS permissions.' : `Send these results (${request.bytes ?? 0} output bytes plus metadata)?`, request.signal, true);
-      }, audit, message => console.log(safeText(message)), { resources, idleMs: idleMinutes * 60000, lifetimeMs: sessionMinutes * 60000 });
+      }, audit, message => console.log(safeText(message)), { resources, idleMs: remembered ? 0 : idleMinutes * 60000, lifetimeMs: remembered ? 0 : sessionMinutes * 60000 });
+      const scheduleGrant = () => { clearTimeout(grantTimer); if (remembered && automatic(remembered)) { engine!.setPermissionMode('auto'); if (remembered.autoUntil !== null) grantTimer = setTimeout(() => { remembered!.autoUntil = 0; store.save(remembered!); engine!.setPermissionMode('ask'); }, Math.max(1, remembered.autoUntil - Date.now())); } };
+      scheduleGrant();
       let active = false, autoRequestedAt = 0;
-      peer.on('active', () => { active = true; console.log(`Session permissions: ${engine!.permissionMode}. Local commands: permissions, permissions auto, permissions ask, jobs, recover <id>, secret <id>, cancel, exit.`); });
+      peer.on('active', () => { active = true; console.log(`Session permissions: ${engine!.permissionMode}. Local commands: pairing, pause, resume, unpair, permissions, permissions auto [forever], permissions ask, jobs, recover <id>, secret <id>, cancel, exit.`); });
       localCommand = value => {
-        if (!active && !['jobs', 'cancel', 'exit', 'permissions ask'].includes(value) && !value.startsWith('recover ') && !value.startsWith('secret ')) return false;
+        if (['pairing', 'pause', 'resume', 'unpair'].includes(value)) {
+          if (value === 'pairing') { console.log(remembered ? `Paired with: ${safeText(remembered.label)} (${remembered.id}); ${remembered.paused ? 'paused' : 'available'}; auto: ${automatic(remembered) ? remembered.autoUntil === null ? 'until revoked' : new Date(remembered.autoUntil).toISOString() : 'off'}` : 'No remembered diagnostician'); return true; }
+          if (!remembered) { console.log('No remembered diagnostician'); return true; }
+          if (value === 'unpair') { store.remove(remembered.id); audit.record('pairing.revoked', { id: remembered.id }); remembered = undefined; engine!.cancelAll(); void resources!.revoke(); peer!.close('Pairing revoked locally'); console.log('Pairing revoked. A new code will be generated.'); }
+          else { remembered.paused = value === 'pause'; store.save(remembered); audit.record('pairing.' + value, { id: remembered.id }); if (remembered.paused) { engine!.cancelAll(); void resources!.revoke(); peer!.close('Paused locally'); } console.log(value === 'pause' ? 'Remote access paused. Type resume to allow connections.' : 'Remote access resumed.'); }
+          return true;
+        }
+        if (!active && !value.startsWith('permissions') && !['jobs', 'cancel', 'exit', 'permissions ask'].includes(value) && !value.startsWith('recover ') && !value.startsWith('secret ')) return false;
         if (value === 'permissions') { console.log(`Permission mode: ${engine!.permissionMode}. AUTO means automatic execution AND transmission to the diagnostician/AI. Use permissions ask to revoke and cancel active work.`); return true; }
-        if (value === 'permissions auto') { autoRequestedAt = Date.now(); console.log('AUTO grants this session automatic execution with your OS permissions AND automatic result transmission. Binary output is not redacted. Type "permissions allow-auto" within 60 seconds to grant, or "permissions ask" to decline.'); return true; }
+        if (value === 'permissions auto' || value === 'permissions auto forever') { autoRequestedAt = value.endsWith(' forever') ? -Date.now() : Date.now(); console.log((remembered ? (autoRequestedAt < 0 ? 'AUTO UNTIL REVOKED, including future connections and probe restarts. ' : 'AUTO FOR ONE HOUR, including future connections and probe restarts. ') : 'AUTO FOR THIS TEMPORARY SESSION. ') + 'Grants automatic execution with your OS permissions AND automatic result transmission. Binary output is not redacted. Type "permissions allow-auto" within 60 seconds to grant, or "permissions ask" to decline.'); return true; }
         if (value === 'permissions allow-auto') {
-          if (autoRequestedAt && Date.now() - autoRequestedAt < 60000) { engine!.setPermissionMode('auto'); autoRequestedAt = 0; }
+          if (autoRequestedAt && Date.now() - Math.abs(autoRequestedAt) < 60000) { engine!.setPermissionMode('auto'); if (remembered) { remembered.autoUntil = autoRequestedAt < 0 ? null : Date.now() + 3600000; store.save(remembered); scheduleGrant(); console.log(remembered.autoUntil === null ? 'AUTO persists until revoked locally.' : 'AUTO expires in one hour, including time disconnected.'); } autoRequestedAt = 0; }
           else console.log('No pending grant. First type "permissions auto" and read its explanation.');
           return true;
         }
-        if (value === 'permissions ask') { autoRequestedAt = 0; engine!.setPermissionMode('ask'); void resources!.revoke().catch(error => console.error(safeText((error as Error).message))); console.log('Approval required. Automatic permissions revoked; any active work is cancelled.'); return true; }
+        if (value === 'permissions ask') { autoRequestedAt = 0; clearTimeout(grantTimer); if (remembered) { remembered.autoUntil = 0; store.save(remembered); } engine!.setPermissionMode('ask'); engine!.cancelAll(); void resources!.revoke().catch(error => console.error(safeText((error as Error).message))); console.log('Approval required. Automatic permissions revoked; any active work is cancelled.'); return true; }
         if (value === 'cancel') { engine!.cancelAll(); void resources!.revoke().catch(error => console.error(safeText((error as Error).message))); console.log('Cancellation requested for the current task/batch and retained resources.'); return true; }
         if (value === 'jobs') { console.log(safeText(JSON.stringify(resources!.listLocal(), null, 2))); return true; }
         if (value.startsWith('recover ')) { const id = value.slice(8).trim(); console.log(`Resource: ${id}\nNew recovery credential (share privately): ${resources!.renewCredential(id)}`); return true; }
@@ -105,17 +125,22 @@ async function main(): Promise<void> {
       rl.on('line', onLocalLine);
       try {
         await peer.open();
-        console.log(`Relay: ${relay}\nAudit: ${audit.path}\nPairing code (10 minutes, share privately):\n${code}\nCtrl+C ends the session and cancels active tasks.`);
+        console.log(remembered ? `Remembered diagnostician: ${safeText(remembered.label)}. Waiting for connections. Local commands: pairing, pause, resume, unpair, permissions ask, permissions auto [forever], cancel, jobs, exit. Audit: ${audit.path}` : `Relay: ${relay}\nAudit: ${audit.path}\nPairing code (10 minutes, share privately):\n${code}\nCtrl+C ends the session and cancels active tasks.`);
         console.log(`Session ended: ${safeText(await peer.ended)}`);
       } catch (error) { if (!shutdown.signal.aborted) console.log(`Relay unavailable: ${safeText((error as Error).message)}. Retained work remains local; retrying in 3 seconds.`); await delay(3000, undefined, { signal: shutdown.signal }).catch(() => {}); }
-      finally { rl.off('line', onLocalLine); }
+      finally { clearTimeout(grantTimer); rl.off('line', onLocalLine); }
       active = false; if (secretPending) await secretPending;
-      if (!shutdown.signal.aborted) console.log('Probe is still running. Retained resources can be resumed after a NEW pairing and local authorization; commands are never replayed. Ctrl+C closes all resources.');
+      if (!shutdown.signal.aborted) { console.log('Probe is still running. Remembered pairing survives reconnects; commands are never replayed. Ctrl+C stops access and closes resources; trust remains until unpair.'); await delay(300, undefined, { signal: shutdown.signal }).catch(() => {}); }
       }
     } else {
-      const code = (await rl.question('Pairing code: ', { signal: shutdown.signal })).trim();
-      const label = await rl.question('Your label / AI provider: ', { signal: shutdown.signal });
-      peer = new Peer({ role: 'join', code, relay, label }); const operator = new Operator(peer);
+      const store = new PairingStore(join(homedir(), '.diagnose', 'pairings'));
+      if (command === 'pair' && (!values.name || !/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/.test(values.name))) throw new Error('Use pair --name NAME (letters, numbers, underscores or hyphens)');
+      if (command === 'pair' && store.list('operator').some(value => value.name === values.name)) throw new Error('Device name already exists');
+      const saved = values.device ? store.get(values.device, 'operator') : undefined;
+      const code = saved?.code ?? (await rl.question('Pairing code: ', { signal: shutdown.signal })).trim();
+      const label = saved?.label ?? await rl.question('Your label / AI provider: ', { signal: shutdown.signal });
+      peer = saved ? (await new RememberedConnection(saved).connect()).peer : new Peer({ role: 'join', code, relay, label, remember: command === 'pair' }); const operator = new Operator(peer);
+      if (command === 'pair') { await peer.open(); if (!peer.rememberedCode) throw new Error('Probe did not support or grant remembered pairing; update both endpoints'); store.add({ role: 'operator', name: values.name!, label, relay, code: peer.rememberedCode }); console.log(`Paired. Start diagnosis with: diagnose agent codex --device ${values.name}`); return; }
       if (command === 'terminal') {
         await peer.open(); const result = await operator.run({ operation: 'process.open', arguments: { pty: true }, reason: 'Open an interactive terminal with continuing raw input/output and persistent shell context' });
         if (result.result.status !== 'ok') throw new Error(result.result.error ?? result.result.status);

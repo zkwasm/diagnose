@@ -6,6 +6,8 @@ import { dirname, join, resolve } from 'node:path';
 import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
+import { PairingStore } from '../dist/pairing.js';
+import { createCode } from '../dist/crypto.js';
 const require = createRequire(import.meta.url);
 const cli = realpathSync(process.env.DIAGNOSE_TEST_CLI ?? resolve('dist/cli.js'));
 
@@ -61,8 +63,10 @@ test('agent forwards termination and cleans the Gemini overlay', { skip: process
 
 for (const agent of ['codex', 'claude', 'gemini']) test(`agent ${agent} loads the same selected Markdown task at startup without exposing its body in argv`, { skip: process.platform === 'win32', timeout: 15000 }, async () => {
   const f = fixture(), source = join(f.root, 'device "profile".md'), body = '# Device task\nPRIVATE_TASK_MARKER\nRead references/profile.md and diagnose the selected device.\nLiteral $(do-not-execute).'; writeFileSync(source, body);
-  const result = await run(['agent', agent, '--skill', source, '--', '--model', 'selected-model'], { ...process.env, HOME: f.root, PATH: f.root + ':' + process.env.PATH, GEMINI_CLI_HOME: f.root, TEST_CAPTURE: f.capture });
+  new PairingStore(join(f.root, '.diagnose', 'pairings')).add({ role: 'operator', name: 'alice-pc', label: 'test', relay: 'https://relay.example.test', code: createCode() });
+  const result = await run(['agent', agent, '--device', 'alice-pc', '--skill', source, '--', '--model', 'selected-model'], { ...process.env, HOME: f.root, PATH: f.root + ':' + process.env.PATH, GEMINI_CLI_HOME: f.root, TEST_CAPTURE: f.capture });
   assert.equal(result.code, 0, result.output); const captured = JSON.parse(readFileSync(f.capture, 'utf8'));
+  assert.deepEqual(captured.server.args.slice(-2), ['--device', 'alice-pc']); assert.match(captured.args.at(-1), /do not ask for a pairing code/);
   assert.equal(captured.task.instructions, body); assert.equal(captured.task.sourceFile, source); assert.equal(captured.task.baseDirectory, f.root); assert.equal(captured.taskMode, 0o600); assert.equal(existsSync(captured.taskPath), false); assert.ok(captured.tools.includes('diagnose_pair'));
   const scopeFlag = agent === 'gemini' ? '--include-directories' : '--add-dir';
   assert.equal(captured.args[captured.args.indexOf(scopeFlag) + 1], dirname(captured.taskPath));

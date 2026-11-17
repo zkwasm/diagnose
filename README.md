@@ -6,7 +6,7 @@ Diagnose is an open-source tool for agent-led remote troubleshooting and problem
 
 [User guide](USER_GUIDE.md) · [Source](https://github.com/zkwasm/diagnose) · [npm](https://www.npmjs.com/package/@masstensor/diagnose) · [Website](https://diagnose.fenginwind.com)
 
-Requires **Node.js 22.18+**. MIT licensed. TypeScript source is included in the npm package. macOS probes and the Linux relay have been tested; Linux and Windows probes remain experimental.
+Requires **Node.js 20.10+**. MIT licensed. TypeScript source is included in the npm package. macOS probes and the Linux relay have been tested; Linux and Windows probes remain experimental.
 
 ## Quick start
 
@@ -106,6 +106,8 @@ No device-specific integration is required in the probe. An approved script can 
 Read the [user guide](USER_GUIDE.md#security-and-local-data) before operating a session. The protocol has not received an independent security audit.
 
 ## Development
+
+Development scripts use Node.js 22.18+ to run TypeScript directly. Installed CLI runtime support starts at Node.js 20.10; users do not need to upgrade an existing compatible runtime.
 
 ```sh
 npm ci

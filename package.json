@@ -9,7 +9,7 @@
     "registry": "https://registry.npmjs.org/"
   },
   "engines": {
-    "node": ">=22.18.0"
+    "node": ">=20.10.0"
   },
   "bin": {
     "diagnose": "dist/cli.js",
@@ -27,7 +27,9 @@
     "test/noise-vector.json",
     "deploy",
     "test/CACOPHONY-LICENSE",
-    "examples/skills"
+    "examples/skills",
+    "scripts/setup-node.sh",
+    "scripts/setup-node.ps1"
   ],
   "scripts": {
     "build": "tsc",

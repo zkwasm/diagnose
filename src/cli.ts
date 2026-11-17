@@ -39,7 +39,7 @@ async function main(): Promise<void> {
   if (command === 'devices') { console.log(JSON.stringify(new PairingStore(join(homedir(), '.diagnose', 'pairings')).list('operator').map(({ name, id, relay }) => ({ name, id, relay })), null, 2)); return; }
   if (command === 'forget') { const store = new PairingStore(join(homedir(), '.diagnose', 'pairings')); store.remove(store.get(values.device ?? '', 'operator').id); console.log('Local pairing removed. Revoke on the user computer to invalidate its credential.'); return; }
   if (command === 'mcp') { await serveMcp(relay, values.device); return; }
-  if (!['start', 'connect', 'terminal', 'pair'].includes(command)) { console.log(`diagnose start|connect|terminal|mcp [relay-url] [--device NAME]\ndiagnose pair [relay-url] --name NAME\ndiagnose devices\ndiagnose forget --device NAME\n${agentUsage}\nNode.js >=22.18. Pairing codes are entered interactively, never as arguments.`); return; }
+  if (!['start', 'connect', 'terminal', 'pair'].includes(command)) { console.log(`diagnose start|connect|terminal|mcp [relay-url] [--device NAME]\ndiagnose pair [relay-url] --name NAME\ndiagnose devices\ndiagnose forget --device NAME\n${agentUsage}\nNode.js >=20.10. Pairing codes are entered interactively, never as arguments.`); return; }
   if (!stdin.isTTY || !stdout.isTTY) throw new Error('Interactive terminal required. AI clients should use diagnose mcp.');
   const rl = createInterface({ input: stdin, output: stdout });
   const shutdown = new AbortController(); let peer: Peer | undefined, engine: ProbeEngine | undefined;

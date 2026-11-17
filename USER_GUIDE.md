@@ -13,12 +13,29 @@ The AI runs on the diagnostician's side. The user does not need to install an AI
 
 ### 1. Prepare both computers
 
-Install **Node.js 22.18+**, including npm, using the [first-time setup instructions](#first-time-setup-install-nodejs-and-npm). Open Terminal on macOS/Linux or Command Prompt on Windows. Check:
+Install Node.js, npm and npx by copying the entire block for your computer. Setup never updates an existing Node.js installation or changes its PATH. It reuses Node.js 20.10+ with working npm/npx. If Node.js is absent, it downloads and verifies official Node.js 22 binaries into your user directory. Older or incomplete installations are left unchanged, with an explanation for your diagnostician. No administrator access is normally needed.
+
+**Windows:** open the Start menu, type **Windows PowerShell**, and open it. Paste:
+
+```powershell
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+& ([scriptblock]::Create((Invoke-WebRequest -UseBasicParsing 'https://diagnose.fenginwind.com/setup/setup-node.ps1').Content))
+```
+
+**Mac:** press **Command + Space**, type **Terminal**, and press Return. **Linux:** open Terminal. Paste:
 
 ```sh
-node --version
-npm --version
+setup_script="$(mktemp)" &&
+curl -fsSL --proto '=https' --proto-redir '=https' https://diagnose.fenginwind.com/setup/setup-node.sh -o "$setup_script" &&
+if command -v node >/dev/null 2>&1; then
+  bash "$setup_script"
+else
+  bash "$setup_script" && . "$HOME/.diagnose/node/env"
+fi &&
+rm -f "$setup_script"
 ```
+
+Wait for **Setup complete** and three version numbers. Keep this window open for the next command. On Windows, use `npx.cmd` and `npm.cmd` wherever this guide says `npx` and `npm`; this avoids PowerShell script-policy errors without changing your security settings. See [setup details and troubleshooting](#first-time-setup-install-nodejs-and-npm) if setup fails.
 
 Only the **diagnostician** needs an installed, signed-in Codex CLI, Claude Code, or Gemini CLI. The person receiving help needs no AI account.
 
@@ -78,9 +95,11 @@ You can also request a read-only investigation and stop after the explanation. C
 
 ## 1. Requirements
 
-Both computers need **Node.js 22.18 or later**, npm, an interactive terminal, and outbound access to the relay. The default relay is `https://diagnose.fenginwind.com`. No inbound port, router change, or SSH server is required.
+Both computers need **Node.js 20.10 or later**, npm, an interactive terminal, and outbound access to the relay. The default relay is `https://diagnose.fenginwind.com`. No inbound port, router change, or SSH server is required.
 
 For an AI session, the diagnostician must separately install and sign in to Codex CLI, Claude Code, or Gemini CLI. Diagnose does not install an agent, provide a model subscription, or change the agent's approval mode.
+
+Node.js 20.10+ runtime compatibility is available in Diagnose 0.5.0+. Earlier Diagnose packages declare Node.js 22.18+; use a compatible Diagnose version rather than automatically upgrading the user's Node.js. The relay deployment wrapper requires Node.js 22+ separately.
 
 Use the latest package on both endpoints. Session agent launchers require 0.3.1 or later; live resource features require 0.3 or later. macOS probes and the Linux relay have been tested. Linux and Windows probes, including Windows ConPTY and Gemini symlink permissions, remain experimental.
 
@@ -90,39 +109,46 @@ If you are the person receiving help, this is the only software setup you need. 
 
 **Node.js** runs Diagnose. **npm** downloads it. **npx** starts it without requiring a separate global installation. The official Node.js installer includes npm and npx; do not download them from separate websites.
 
-If Node.js is already installed, go straight to [Check the installation](#check-the-installation). Otherwise, follow the instructions for your computer below. The installer may ask for your computer's normal administrator approval. Enter any OS password only in your computer's own prompt, not in a chat or the diagnostic session.
+### Windows: copy and paste setup
 
-### Windows
+Open the **Start** menu, type **Windows PowerShell**, and open it normally. Copy the complete block below, paste it into that window, and press Enter:
 
-1. Open [the official Node.js download page](https://nodejs.org/en/download) in your web browser.
-2. Select **Node.js 22 LTS**, version **22.18 or later**, in the version selector. This is the major version used for Diagnose's existing validation. Select **Windows** and download the **Windows Installer (.msi)**, rather than a ZIP archive or source code. The page's first selected version may be a different major release.
-3. Use **x64** for most Intel/AMD PCs. For an ARM-based PC, use **ARM64**. If unsure, check **Settings → System → About → System type** or ask the person helping you.
-4. Open the downloaded `.msi` file and follow the installer. Keep the default features, including **npm package manager** and **Add to PATH**. You do not need to select optional extra development tools just to follow this guide.
-5. Close any command or terminal windows that were open before installation.
-6. Open the **Start** menu, type **Command Prompt** or **cmd**, and open it. This is the window where you will paste the commands below; you do not need to run it as administrator.
+```powershell
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+& ([scriptblock]::Create((Invoke-WebRequest -UseBasicParsing 'https://diagnose.fenginwind.com/setup/setup-node.ps1').Content))
+```
 
-The Windows probe is still experimental. If a feature or device driver does not work, keep the error message and ask your diagnostician for help.
+The script detects x64 or ARM64 automatically, checks Node.js/npm/npx, and installs into your user profile only if Node.js is absent. An existing version is never upgraded or replaced. Wait for **Setup complete**. Use `npx.cmd @masstensor/diagnose@latest start` in the same window. No execution-policy change or administrator terminal is required. Windows support remains experimental; this installer has not yet had Windows hardware validation.
 
-### Mac
+### Mac or Linux: copy and paste setup
 
-1. Open [the official Node.js download page](https://nodejs.org/en/download) in Safari or another web browser.
-2. Select **Node.js 22 LTS**, version **22.18 or later**, in the version selector. Select **macOS** and download the **macOS Installer (.pkg)**, rather than a compressed archive or source code.
-3. If asked for a processor type, choose **ARM64** for Apple silicon (M1, M2, M3, or later) or **x64** for an Intel Mac. Check **Apple menu → About This Mac** if you are unsure.
-4. Open the downloaded `.pkg` file and follow the installer, keeping its default features.
-5. Close terminal windows that were open before installation.
-6. Press **Command + Space**, type **Terminal**, and press **Return**. Paste the commands below into this Terminal window.
+On a Mac, press **Command + Space**, type **Terminal**, and press Return. On Linux, open Terminal. Copy the entire block, paste it, and press Return:
 
-You do not need Homebrew, a version manager, or a developer account for this installer-based route.
+```sh
+setup_script="$(mktemp)" &&
+curl -fsSL --proto '=https' --proto-redir '=https' https://diagnose.fenginwind.com/setup/setup-node.sh -o "$setup_script" &&
+if command -v node >/dev/null 2>&1; then
+  bash "$setup_script"
+else
+  bash "$setup_script" && . "$HOME/.diagnose/node/env"
+fi &&
+rm -f "$setup_script"
+```
 
-### Linux or a managed work computer
+Wait for **Setup complete**, then run `npx @masstensor/diagnose@latest start` in the same window. If Node.js is absent, the script selects Intel/x64 or ARM64 automatically. It needs curl, tar, and a SHA-256 utility, which are included on macOS and common Linux desktop distributions. Linux requires a compatible official Node.js binary; minimal, musl-based or older distributions may need help from the diagnostician.
 
-For Linux, follow the [official Node.js installation instructions](https://nodejs.org/en/download) for your distribution and ensure the installed version is **22.18 or later**. Distribution package repositories can contain older versions. Linux probes remain experimental.
+### What setup changes
 
-If a work or school computer does not allow software installation, ask your IT administrator or diagnostician for help. Do not change security policies to get around the restriction.
+- Reuses a working Node.js **20.10+**, npm and npx without changes. If any Node.js installation exists, setup does not update it, replace it, change PATH, or repair missing npm automatically. An older or incomplete installation stops setup and explains the requirement.
+- Only when Node.js is absent, downloads Node.js 22 binaries and SHA-256 checksums from **nodejs.org**, verifies the download, and installs under `~/.diagnose/node` on Mac/Linux or `%USERPROFILE%\.diagnose\node` on Windows.
+- For a new installation only, configures the current user's PATH. On Mac it adds a guarded environment line to `.zshrc` and `.bash_profile`; on Linux, to `.bashrc` and `.profile`. It preserves other profile contents and avoids duplicate lines. On Windows it prepends the private runtime directory to your user PATH.
+- Prints Node.js, npm and npx versions and stops on a download, checksum or verification error. It does not install an AI agent or start a diagnosis automatically.
+
+You can read the [Mac/Linux script](https://diagnose.fenginwind.com/setup/setup-node.sh), [Windows script](https://diagnose.fenginwind.com/setup/setup-node.ps1), or [their source on GitHub](https://github.com/zkwasm/diagnose/tree/main/scripts) before running setup. The installer needs internet access to this website and nodejs.org. If installation is blocked by an organization policy, ask your diagnostician or IT administrator for help.
 
 ### Check the installation
 
-In Command Prompt on Windows, or Terminal on a Mac, paste **one line at a time** and press Enter/Return after each:
+The setup script performs these checks automatically. To check again in Terminal or Windows Command Prompt, paste one line at a time (in PowerShell use `npm.cmd` and `npx.cmd`):
 
 ```sh
 node --version
@@ -130,7 +156,7 @@ npm --version
 npx --version
 ```
 
-Each command should print a version number. The Node.js number begins with `v` and must be **22.18.0 or later**. npm and npx have their own version numbers; they do not need to match Node.js. If your installed Node.js already meets the requirement, you do not need to reinstall it.
+Each command should print a version number. The Node.js number begins with `v` and must be **20.10.0 or later**. npm and npx have their own version numbers; they do not need to match Node.js. If your installed Node.js already meets the requirement, you do not need to reinstall it.
 
 You are now ready. Paste this single command into the same window and press Enter/Return:
 
@@ -146,9 +172,9 @@ Copy only the command, not a leading dollar-sign prompt, the surrounding code-bo
 
 | What you see | What to do |
 | --- | --- |
-| “node is not recognized” or “command not found” | Close and reopen Command Prompt/Terminal, then try again. If it still fails, run the official installer again with the default PATH option, or ask your diagnostician for help. |
-| An older Node.js version | Install Node.js 22 LTS at version 22.18 or later, reopen the terminal, and repeat the three version checks. |
-| npm or npx is missing | Re-run the official Node.js installer with npm selected. npm and npx should come with it. |
+| “node is not recognized” or “command not found” | Close and reopen Command Prompt/Terminal, then try again. If it still fails, run the setup block above again, or ask your diagnostician for help. |
+| An older Node.js version | Setup leaves it unchanged. Share the detected version with your diagnostician; a separate runtime can be considered with your agreement. |
+| npm or npx is missing | Setup leaves the existing Node.js unchanged. Ask your diagnostician to repair npm/npx or discuss a separate runtime. |
 | PowerShell says `npm.ps1` or `npx.ps1` cannot run because scripts are disabled | Open **Command Prompt (cmd)** and run the same commands there. You do not need to change PowerShell's execution policy. |
 | “EACCES”, “EPERM”, or “permission denied” during a global install | Use the `npx … start` command above instead of `npm install -g`. If that also fails, share the error with your diagnostician; do not add `sudo` or change folder permissions at random. |
 | A download, certificate, or network error | Check your internet connection and ask your diagnostician or IT administrator for help. Do not disable certificate checks or your firewall. |

@@ -50,9 +50,9 @@ export class VaultServer {
       if (this.activeUploads >= 2) { send(429, { error: 'Upload capacity reached' }); return; }
       if (existsSync(join(directory, id))) { send(409, { error: 'Immutable object already exists' }); return; }
       this.activeUploads++;
+      const deadline = setTimeout(() => req.destroy(), 30000);
       try {
         const chunks: Buffer[] = []; let size = 0;
-        req.setTimeout(30000, () => req.destroy());
         for await (const chunk of req) { size += chunk.length; if (size > length) throw new Error('Size mismatch'); chunks.push(Buffer.from(chunk)); }
         if (size !== length) throw new Error('Incomplete upload');
         // Commit checks are synchronous so concurrent requests cannot overrun quota.
@@ -66,7 +66,7 @@ export class VaultServer {
         try { writeFileSync(path, Buffer.concat(chunks), { flag: 'wx', mode: 0o600, flush: true }); renameSync(path, join(directory, id)); }
         finally { if (existsSync(path)) unlinkSync(path); }
         send(201, { stored: true });
-      } finally { this.activeUploads--; }
+      } finally { clearTimeout(deadline); this.activeUploads--; }
     } catch { if (!res.headersSent && !res.destroyed) send(400, { error: 'Library request failed' }); else res.destroy(); }
   }
 }

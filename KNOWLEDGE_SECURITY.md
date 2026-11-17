@@ -34,7 +34,7 @@ This separation is a workflow guard, not an OS security boundary: an agent allow
 
 ## Relay operations
 
-Set `VAULT_PATH` to persistent storage outside release directories. Run one relay process, not multiple workers sharing this filesystem. Route `/v1/library` and `/v1/library/*` through the existing HTTPS proxy. Do not log Authorization headers. Current limits: 12 MiB per encrypted object, 128 objects and 128 MiB per library, 1 GiB total, 1,000 namespaces including revocation tombstones, two concurrent uploads, 600 requests per IP per minute, 30-second upload inactivity timeout. Hosting a public capability store still requires monitoring for abuse; quotas bound this implementation's storage use.
+Set `VAULT_PATH` to persistent storage outside release directories. Run one relay process, not multiple workers sharing this filesystem. Route `/v1/library` and `/v1/library/*` through the existing HTTPS proxy. Do not log Authorization headers. Current limits: 12 MiB per encrypted object, 128 objects and 128 MiB per library, 1 GiB total, 1,000 namespaces including revocation tombstones, two concurrent uploads, 600 requests per IP per minute, 30-second total upload deadline. Hosting a public capability store still requires monitoring for abuse; quotas bound this implementation's storage use.
 
 A write is staged and atomically renamed only after the full declared body arrives and quotas are rechecked. Unpublished staging files are removed on startup. Per-object writes are flushed before publication. Keep the host disk backed by a reliable filesystem; atomic publication does not promise survival of every filesystem or power failure.
 

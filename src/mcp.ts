@@ -11,7 +11,7 @@ import { randomUUID } from 'node:crypto';
 import { safeText } from './util.js';
 
 export async function serveMcp(relay: string): Promise<void> {
-  const server = new McpServer({ name: 'diagnose', version: '0.3.2' });
+  const server = new McpServer({ name: 'diagnose', version: '0.4.0' });
   let operator: Operator | undefined;
   const transfers = new Map<string, { progress: TransferProgress; controller: AbortController }>(), forwards = new Map<string, Forward>();
   const answer = (value: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(value) }], structuredContent: value as Record<string, unknown> });

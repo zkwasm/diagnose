@@ -146,6 +146,71 @@ Then tell the agent what to inspect and provide the pairing code in the agent co
 
 The code and diagnostic results enter your chosen AI provider's context. The user must still accept the connection on their own computer. Ask the agent to use the `diagnose_*` tools for remote actions: its normal shell and file tools still act on the diagnostician's computer.
 
+## Start with a device skill or Markdown task
+
+Version **0.4.0+** can start the agent with a selected diagnostic procedure. The syntax is identical for all three agents:
+
+```sh
+diagnose agent codex --skill ./devices/owon.md
+diagnose agent claude --skill ./devices/owon.md
+diagnose agent gemini --skill ./devices/owon.md
+```
+
+Use a local UTF-8 `.md` or `.markdown` file, up to 256 KiB. A directory containing `SKILL.md` also works:
+
+```sh
+diagnose agent codex --skill ./skills/my-device
+```
+
+For example:
+
+```text
+skills/my-device/
+  SKILL.md
+  references/device-profile.md
+  scripts/check-device.js
+```
+
+The launcher reads and validates the entry before starting the agent, saves a private `0600` session snapshot with its source path, reference directory, and SHA-256, and supplies an initial task to read that snapshot and begin. The instruction text is not placed in process arguments. The snapshot is removed when the launcher exits normally or handles termination. An uncatchable kill or power loss can leave temporary files behind.
+
+The agent follows the entry, reads references as needed, and works toward diagnosis, authorized repair, and verification. If a pairing code, target identity, or necessary detail is missing, it asks before continuing. Do not store pairing codes, credentials, or other secrets in reusable task files; selected instructions and referenced material that the agent reads can enter the AI provider's context.
+
+Relative references resolve against the original entry directory, not the temporary snapshot. Keep that directory available during the session. Only the entry is snapshotted; referenced files are read from the original directory. Scripts are not executed by the launcher merely because they exist. The agent runs them only as required by the task and existing permissions.
+
+Referenced scripts initially live on the diagnostician computer. To use one remotely, the agent must explicitly submit its contents or transfer it to the user's computer with authorization. A path on one endpoint is not automatically a path on the other.
+
+### Writing a reusable procedure
+
+Describe:
+
+- The supported device or problem and the desired verification check.
+- How to identify the target, and what missing information to ask for.
+- Read-only evidence to collect and how to interpret it.
+- Permitted repairs, their impact, prohibited actions, and available recovery steps.
+- How to verify the original problem and report unresolved issues.
+
+A minimal task could be:
+
+```markdown
+# Local service troubleshooting
+
+Start now using Diagnose MCP. Ask for the pairing code and target service
+if missing. Pair and wait for local consent. Inspect logs and configuration
+without changing them first. Explain the likely cause and repair plan.
+Apply only authorized changes, repeat the original failing check, and
+report what changed, the evidence, and anything unresolved.
+```
+
+The package includes `examples/skills/owon.md` and `examples/skills/device-troubleshooting/SKILL.md` with a referenced profile template. They are templates, not verified universal repair recipes. Customize them for the actual device and authorization scope. [Browse or download the examples](https://github.com/zkwasm/diagnose/tree/main/examples/skills).
+
+### Permissions and compatibility
+
+The task starts automatically; permissions do not change automatically. Remote pairing and local user consent still apply. For continuous execution and transmission, the user can explicitly choose session auto mode. The coding agent's own tool approvals may still appear; Diagnose does not bypass them.
+
+This is portable Markdown task loading, not native installation of a Codex, Claude, or Gemini skill. Frontmatter can remain in the file as text. Vendor-specific hooks, tool names, scripts, and dependencies are not automatically translated or installed. Use `diagnose_*` names for remote tools and adapt any agent-specific instructions.
+
+With `--skill`, use native startup flags such as `--model` after `--`; do not also supply a separate prompt, headless prompt option, resume command, or another CLI subcommand. Gemini explicitly rejects a second prompt option. Use the normal launcher without `--skill` for those other modes.
+
 ### Session configuration and extra arguments
 
 ```sh

@@ -1,6 +1,6 @@
 {
   "name": "@masstensor/diagnose",
-  "version": "0.3.2",
+  "version": "0.4.0",
   "description": "Agent-led remote troubleshooting and problem resolution, with end-to-end encryption and user-controlled permissions",
   "type": "module",
   "license": "MIT",
@@ -26,7 +26,8 @@
     "test/*.test.ts",
     "test/noise-vector.json",
     "deploy",
-    "test/CACOPHONY-LICENSE"
+    "test/CACOPHONY-LICENSE",
+    "examples/skills"
   ],
   "scripts": {
     "build": "tsc",

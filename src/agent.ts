@@ -5,16 +5,19 @@ import { tmpdir, homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
+import { loadSkill, skillPrompt } from './skill.js';
 
-export const agentUsage = 'diagnose agent codex|claude|gemini [--relay URL] [-- agent arguments...]';
+export const agentUsage = 'diagnose agent codex|claude|gemini [--skill FILE.md|DIRECTORY] [--relay URL] [-- agent arguments...]';
 
 export async function launchAgent(argv: string[]): Promise<number> {
   const separator = argv.indexOf('--');
   const extra = separator < 0 ? [] : argv.slice(separator + 1);
-  const { positionals, values } = parseArgs({ args: separator < 0 ? argv : argv.slice(0, separator), allowPositionals: true, options: { relay: { type: 'string' }, help: { type: 'boolean', short: 'h' } } });
+  const { positionals, values } = parseArgs({ args: separator < 0 ? argv : argv.slice(0, separator), allowPositionals: true, options: { relay: { type: 'string' }, skill: { type: 'string' }, help: { type: 'boolean', short: 'h' } } });
   if (values.help || !positionals.length) { console.log(agentUsage); return 0; }
   const [agent] = positionals;
   if (positionals.length !== 1 || !['codex', 'claude', 'gemini'].includes(agent)) throw new Error(agentUsage);
+  const skill = values.skill === undefined ? undefined : await loadSkill(values.skill);
+  if (skill && agent === 'gemini' && extra.some(arg => ['-p', '--prompt', '-i', '--prompt-interactive'].includes(arg) || arg.startsWith('--prompt=') || arg.startsWith('--prompt-interactive='))) throw new Error('--skill supplies the initial task; do not also pass a Gemini prompt option');
   if (values.relay) {
     const url = new URL(values.relay);
     if (!['https:', 'wss:'].includes(url.protocol) && !(['http:', 'ws:'].includes(url.protocol) && ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname))) throw new Error('Relay requires HTTPS/WSS, except loopback tests');
@@ -24,6 +27,14 @@ export async function launchAgent(argv: string[]): Promise<number> {
   const server = { command: process.execPath, args: [fileURLToPath(new URL('./cli.js', import.meta.url)), 'mcp', ...(values.relay ? [values.relay] : [])] };
   const env = { ...process.env }; let directory: string | undefined;
   try {
+    let prompt: string | undefined;
+    if (skill) {
+      directory = await mkdtemp(join(tmpdir(), 'diagnose-agent-'));
+      const snapshot = join(directory, 'task.json');
+      await writeFile(snapshot, JSON.stringify(skill), { mode: 0o600 });
+      prompt = skillPrompt(snapshot);
+      console.error('Starting the selected skill. Its instructions and referenced data may be sent to your chosen AI provider. Remote pairing and existing permissions still apply.');
+    }
     let args: string[];
     if (agent === 'codex') args = ['-c', `mcp_servers.diagnose.command=${JSON.stringify(server.command)}`, '-c', `mcp_servers.diagnose.args=${JSON.stringify(server.args)}`, ...extra];
     else if (agent === 'claude') args = ['--mcp-config', JSON.stringify({ mcpServers: { diagnose: server } }), ...extra];
@@ -35,7 +46,7 @@ export async function launchAgent(argv: string[]): Promise<number> {
       let settings: Record<string, unknown> = {};
       try { settings = JSON.parse((await readFile(original, 'utf8')).replace(/^\uFEFF/, '')); } catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw new Error(`Cannot read Gemini user settings: ${(error as Error).message}`); }
       if (!settings || typeof settings !== 'object' || Array.isArray(settings)) throw new Error('Gemini user settings must be a JSON object');
-      directory = await mkdtemp(join(tmpdir(), 'diagnose-agent-'));
+      directory ??= await mkdtemp(join(tmpdir(), 'diagnose-agent-'));
       const configRoot = join(directory, '.gemini'); await mkdir(configRoot, { mode: 0o700 });
       let entries: string[] = [];
       try { entries = await readdir(originalRoot); } catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; }
@@ -44,6 +55,7 @@ export async function launchAgent(argv: string[]): Promise<number> {
       await writeFile(path, JSON.stringify({ ...settings, mcpServers: { ...(settings.mcpServers as object ?? {}), diagnose: server } }), { mode: 0o600 });
       env.GEMINI_CLI_HOME = directory; args = extra;
     }
+    if (prompt) args = agent === 'gemini' ? [...args, '--prompt-interactive', prompt] : [...args, '--', prompt];
     return await new Promise<number>((resolveExit, reject) => {
       const child = spawn(agent, args, { env, stdio: 'inherit', shell: false });
       const interrupt = () => { child.kill('SIGINT'); }, terminate = () => { child.kill('SIGTERM'); };

@@ -40,6 +40,20 @@ diagnose start
 diagnose agent codex
 ```
 
+## Start with a device skill or Markdown task
+
+Requires **0.4.0+**. Use the same option with every supported agent:
+
+```sh
+diagnose agent codex --skill ./devices/owon.md
+diagnose agent claude --skill ./devices/owon.md
+diagnose agent gemini --skill ./devices/owon.md
+```
+
+A directory is also accepted: `--skill ./skills/my-device` reads its `SKILL.md`. Relative references remain based on that file's original directory. Diagnose snapshots the entry and supplies a startup task that tells the agent to read it and begin, instead of waiting for you to repeat the task. It asks for a pairing code or other missing target details when needed.
+
+This is a session task, not a global native-skill installation or an additional permission grant. User approvals and the agent's own tool permissions still apply. Instructions can be sent to your AI provider. See the [guide](USER_GUIDE.md#start-with-a-device-skill-or-markdown-task) and [examples](https://github.com/zkwasm/diagnose/tree/main/examples/skills).
+
 ## From problem to verified result
 
 1. **Define the problem:** agree on the symptom and what a successful outcome looks like.

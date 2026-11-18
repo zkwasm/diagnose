@@ -35,36 +35,154 @@ function draw(index: number, time: number) {
   header(time, index); c.save(); c.globalAlpha = Math.min(ease(local / .32), ease((scene.end - time) / .28));
   if (index !== 0 && index !== 8) { text(scene.title, 100, 210, 53, C.ink, 600); text(scene.subtitle, 100, 265, 27, C.muted); }
   if (index === 0) {
-    enter(local, .05, () => { smallHeading('AGENT-LED REMOTE TROUBLESHOOTING', 100, 215); text('Diagnose and fix.', 100, 365, 109, C.ink, 600); text('Remotely, with', 100, 492, 101, C.green, 500); text('your AI agent.', 100, 610, 101, C.green, 500); wrap('A computer. A connected device. A problem worth solving.', 105, 712, 1010, 34); });
-    enter(local, .45, () => { box(1250, 220, 570, 562, C.pale, 27, '#cbd6bd'); const labels = ['REPORTED PROBLEM', 'INVESTIGATE', 'AUTHORIZED FIX', 'CHECK THE RESULT']; labels.forEach((label, i) => { const y = 285 + i * 133; if (i) line(1535, y - 87, 1535, y - 51, '#9bb384', 3); box(1300, y - 26, 470, 68, i === 3 ? C.green : C.paper, 12); text(label, 1535, y + 17, 24, i === 3 ? C.lime : C.green, 500, true, 'center'); if (i === 3) tick(1730, y + 5, C.lime, .8); }); });
+    enter(local, .05, () => {
+      smallHeading('REMOTE DEVICE DIAGNOSIS', 100, 238);
+      text('The gateway is on.', 100, 385, 100, C.ink, 600);
+      text('Readings stopped.', 100, 510, 100, C.green, 500);
+      wrap('Use your AI agent to investigate through the computer next to the device.', 105, 639, 970, 37);
+    });
+    enter(local, .45, () => {
+      terminal(1170, 260, 650, 473, 'IOT DASHBOARD');
+      text('Workshop gateway', 1212, 414, 40, C.white, 600);
+      text('Last reading', 1212, 498, 28, C.dim);
+      text('42 W', 1212, 601, 78, C.lime, 600, true);
+      line(1210, 643, 1776, 643, '#46563f');
+      text('Waiting for new data', 1212, 690, 26, C.amber);
+    });
   } else if (index === 1) {
-    enter(local, .05, () => { terminal(100, 335, 1150, 435, "USER'S COMPUTER"); command('$ npx @masstensor/diagnose@latest start', 140, 468, local, .6, 32); if (local > 1.8) { text('Pairing code (10 minutes, share privately):', 140, 553, 26, C.dim); box(138, 584, 1068, 109, '#2f4432', 12); text('D1.<route>.<random-secret>', 164, 632, 36, C.lime, 500, true); text('Example only — not a usable pairing code', 165, 671, 22, C.dim); } });
-    enter(local, .4, () => { box(1310, 335, 510, 435, C.pale, 23); smallHeading('FIRST-TIME SETUP', 1350, 394); text('Install Node.', 1350, 478, 46, C.ink, 600); text('npm is included.', 1350, 542, 36, C.green); wrap('Windows and Mac instructions are in the user guide.', 1350, 615, 425, 28); });
+    enter(local, .05, () => {
+      terminal(100, 335, 1150, 465, 'ON-SITE COMPUTER');
+      command('$ npx @masstensor/diagnose@latest start', 140, 463, local, .5, 32);
+      enter(local, 1.6, () => text('Selected: a · Auto tasks only', 140, 532, 29, C.white));
+      enter(local, 2.6, () => {
+        text('One-time invitation · 30 minutes', 140, 604, 26, C.dim);
+        box(140, 632, 1040, 100, '#2f4432', 12);
+        text('abc-def-ghi', 167, 695, 42, C.lime, 600, true);
+        pill(local > 5.1 ? 'COPIED' : 'COPY CODE', 955, 660, 182, true);
+      });
+    });
+    enter(local, .4, () => {
+      box(1310, 335, 510, 465, C.pale, 23);
+      smallHeading('ON SITE', 1350, 394);
+      text('Gateway', 1350, 479, 42, C.ink, 600);
+      line(1371, 507, 1371, 566, '#9bb384', 4);
+      text('USB data cable', 1402, 545, 29, C.green);
+      text('Computer', 1350, 632, 42, C.ink, 600);
+      wrap('Keep this terminal open and share the invitation privately.', 1350, 704, 418, 27);
+    });
   } else if (index === 2) {
-    enter(local, .05, () => { terminal(100, 335, 1130, 445, "DIAGNOSTICIAN'S COMPUTER"); command('$ npx @masstensor/diagnose@latest agent codex', 140, 478, local, .5, 30); text('Or replace codex with:', 140, 557, 25, C.dim); text('claude', 140, 612, 30, C.white, 500, true); text('gemini', 140, 661, 30, C.white, 500, true); text('Agent CLI must already be installed and signed in.', 140, 738, 22, C.dim); });
-    enter(local, .5, () => { box(1285, 335, 535, 445, C.pale, 23); smallHeading('FOR THIS LAUNCH', 1325, 397); text('Your agent', 1325, 483, 44, C.ink, 600); text('+ remote tools', 1325, 546, 43, C.green, 600); line(1325, 584, 1775, 584, '#c4d1b8'); wrap('No permanent MCP entry. Give the agent the code and describe what is failing.', 1325, 636, 437, 29); });
+    enter(local, .05, () => {
+      terminal(100, 335, 1130, 465, 'CODEX · DIAGNOSTICIAN');
+      command('$diagnose:connect', 140, 476, local, .7, 38);
+      enter(local, 2.2, () => text('Invitation: abc-def-ghi', 140, 554, 30, C.lime, 500, true));
+      enter(local, 3.0, () => wrap('The gateway is connected by USB. Find why fresh readings stopped reaching the dashboard.', 140, 634, 1010, 35, C.white, 1.3));
+    });
+    enter(local, .5, () => {
+      box(1285, 335, 535, 465, C.pale, 23);
+      smallHeading('INSTALL THE SKILL ONCE', 1325, 397);
+      wrap('Follow the GitHub install steps for your agent.', 1325, 475, 448, 32, C.ink);
+      line(1325, 560, 1775, 560, '#c4d1b8');
+      text('Claude Code', 1325, 615, 24, C.muted);
+      text('/diagnose:connect', 1325, 659, 30, C.green, 500, true);
+      text('Gemini CLI · use the connect skill', 1325, 736, 26, C.green);
+    });
   } else if (index === 3) {
-    enter(local, .05, () => { terminal(100, 335, 1060, 459, 'LOCAL CONNECTION APPROVAL'); text('Requested by: Your diagnostician / AI provider', 140, 450, 25, C.white, 500, true); text('Label is self-reported. Check the fingerprint.', 140, 499, 23, C.dim); const rows = [['y', 'Review each task and result transfer'], ['a', 'Auto execute AND transmit this session'], ['N', 'Decline the connection']]; rows.forEach(([key, label], i) => { box(140, 539 + i * 70, 48, 47, i === 0 ? C.lime : '#354936', 9); text(key, 164, 572 + i * 70, 27, i === 0 ? C.ink : C.lime, 600, true, 'center'); text(label, 212, 572 + i * 70, 27, C.white); }); });
-    enter(local, .6, () => { box(1220, 335, 600, 459, C.pale, 23); smallHeading('THE USER DECIDES', 1260, 400); text('One session.', 1260, 487, 51, C.ink, 600); text('Clear permission.', 1260, 552, 43, C.green, 600); wrap('The remote agent cannot enable auto mode. Raw live channels require continuing I/O permission.', 1260, 638, 505, 28); });
+    enter(local, .05, () => {
+      terminal(100, 335, 1060, 465, 'PAIRING PROGRESS · AGENT');
+      ['Relay connected', 'Probe authenticated · waiting for acceptance', 'Paired with the on-site probe'].forEach((label, i) => enter(local, .5 + i * 1.15, () => {
+        tick(157, 460 + i * 104, i === 1 ? C.amber : C.lime, .8);
+        text(label, 197, 470 + i * 104, 31, i === 1 ? C.amber : C.white);
+      }));
+    });
+    enter(local, .5, () => {
+      box(1220, 335, 600, 465, C.pale, 23);
+      smallHeading('ON-SITE CONFIRMATION', 1260, 399);
+      text('Auto tasks only', 1260, 485, 41, C.ink, 600);
+      wrap('Checks and results are automatic once the user confirms pairing.', 1260, 552, 510, 31);
+      enter(local, 1.9, () => pill('y · CONFIRM', 1260, 664, 235));
+      text('Review and Approve everything are also available.', 1260, 754, 23, C.green);
+    });
   } else if (index === 4) {
-    const nodes = [{ x: 100, label: 'YOUR AGENT', detail: 'Local MCP bridge' }, { x: 750, label: 'RELAY', detail: 'Ciphertext only' }, { x: 1400, label: 'USER PROBE', detail: 'Computer / USB / LAN' }];
-    packet(535, 750, 515, local); packet(1185, 1400, 515, local + .5);
-    nodes.forEach((node, i) => enter(local, .1 + i * .15, () => { box(node.x, 358, 435, 308, i === 1 ? C.pale : C.panel, 24); text(node.label, node.x + 217, 455, 32, i === 1 ? C.green : C.lime, 600, true, 'center'); text(i === 1 ? '◇' : '›_', node.x + 217, 537, 57, i === 1 ? C.green : C.white, 500, true, 'center'); text(node.detail, node.x + 217, 610, 25, i === 1 ? C.muted : C.dim, 500, false, 'center'); }));
-    enter(local, 1.2, () => { wrap('The relay cannot read commands or results. It can see IP addresses, timing, and traffic volume.', 170, 737, 1590, 28, C.muted); });
-    enter(local, 2.4, () => { text('The diagnostician and their AI provider can read results.', 960, 825, 29, C.green, 500, false, 'center'); });
+    const nodes = [
+      { label: 'AI AGENT', detail: 'Remote diagnostician' },
+      { label: 'RELAY', detail: 'Encrypted traffic' },
+      { label: 'ON-SITE COMPUTER', detail: 'Diagnose probe' },
+      { label: 'IOT GATEWAY', detail: 'Connected by USB' },
+    ];
+    packet(450, 556, 507, local);
+    packet(906, 1012, 507, local + .5);
+    line(1362, 507, 1468, 507, C.green, 3);
+    nodes.forEach((node, i) => enter(local, .1 + i * .2, () => {
+      const x = 100 + 456 * i;
+      const light = i === 1 || i === 3;
+      box(x, 368, 350, 280, light ? C.pale : C.panel, 24);
+      text(node.label, x + 175, 466, 26, light ? C.green : C.lime, 600, true, 'center');
+      text(node.detail, x + 175, 566, 27, light ? C.muted : C.dim, 500, false, 'center');
+    }));
+    enter(local, 1.2, () => text('The diagnostician and their AI provider can see the results.', 960, 758, 29, C.green, 500, false, 'center'));
   } else if (index === 5) {
-    enter(local, .05, () => { terminal(100, 335, 775, 470, 'READ-ONLY INVESTIGATION · EXAMPLE'); const rows = ['Application cannot reach local service', 'Collect logs + inspect configuration', 'Service is listening on port 8080', 'Application is configured for 8081']; rows.forEach((row, i) => enter(local, .6 + i * .7, () => { text(String(i + 1).padStart(2, '0'), 140, 446 + i * 80, 22, C.dim, 500, true); wrap(row, 195, 446 + i * 80, 630, 26, i === 3 ? C.amber : C.white, 1.2); })); });
-    enter(local, 2.8, () => { box(930, 335, 890, 470, C.pale, 24); smallHeading('PROPOSED REPAIR · EXAMPLE', 970, 398); text('Change one port.', 970, 486, 52, C.ink, 600); pill('8081 → 8080', 970, 524, 278); wrap('Explain the impact. Preserve the original setting where practical. Apply only authorized changes.', 970, 624, 797, 30); text('Then repeat the original failing check.', 970, 755, 28, C.green); });
+    enter(local, .05, () => {
+      terminal(100, 335, 915, 470, 'READ-ONLY CHECKS');
+      const rows = ['Probe confirmed online', 'Gateway serial port: usbserial-B', 'Gateway sample at 10:42:08: 43 W', 'Collector setting: usbserial-A'];
+      rows.forEach((row, i) => enter(local, .55 + i * .8, () => {
+        text(String(i + 1).padStart(2, '0'), 140, 456 + i * 87, 22, C.dim, 500, true);
+        text(row, 205, 456 + i * 87, 27, i === 3 ? C.amber : C.white, 500, true);
+      }));
+    });
+    enter(local, 2.8, () => {
+      box(1065, 335, 755, 470, C.pale, 24);
+      smallHeading('AGENT FINDING', 1105, 398);
+      text('Stale port setting', 1105, 483, 50, C.ink, 600);
+      wrap('The gateway is producing readings. The collector is listening on its previous USB serial port.', 1105, 570, 663, 33, C.green);
+      text('Proposed change: update the collector.', 1105, 755, 27, C.green);
+    });
   } else if (index === 6) {
-    enter(local, .05, () => { terminal(100, 335, 920, 467, 'AUTHORIZED REPAIR · ILLUSTRATIVE'); const rows = [['Approved target', 'Application configuration'], ['Before', 'service_port = 8081'], ['After', 'service_port = 8080']]; rows.forEach(([label, value], i) => { text(label, 140, 449 + i * 91, 22, C.dim); if (i < 2 || local > 1.2) text(value, 140, 487 + i * 91, 31, i === 2 ? C.lime : C.white, 500, true); }); if (local > 2.2) { tick(160, 754, C.lime); text('Guarded write · before/after hashes', 195, 764, 25, C.dim); } });
-    enter(local, .5, () => { const labels = ['COMMANDS & SCRIPTS', 'LIVE PTY / STDIN', 'FILES & TRANSFERS', 'TCP / SOCKS5', 'USB / SERIAL']; labels.forEach((label, i) => { box(1090, 335 + i * 96, 730, 77, i % 2 === 0 ? C.pale : '#edf0e4', 12); text(label, 1120, 383 + i * 96, 26, C.green, 500, true); tick(1770, 374 + i * 96, C.green, .7); }); });
+    enter(local, .05, () => {
+      terminal(100, 335, 920, 467, 'ON-SITE COLLECTOR CONFIGURATION');
+      const rows = [['Previous port', 'device_port = usbserial-A'], ['Confirmed port', 'device_port = usbserial-B']];
+      rows.forEach(([label, value], i) => {
+        text(label, 140, 462 + i * 121, 25, C.dim);
+        text(value, 140, 513 + i * 121, 34, i === 1 ? C.lime : C.white, 500, true);
+      });
+      enter(local, 3.0, () => { tick(160, 747, C.lime); text('Approved change applied', 198, 759, 28, C.white); });
+    });
+    enter(local, .7, () => {
+      box(1090, 335, 730, 467, C.pale, 24);
+      smallHeading('AGENT CHAT', 1130, 398);
+      wrap('I can update the collector setting and restore the old value if needed.', 1130, 492, 630, 33, C.ink);
+      enter(local, 1.8, () => {
+        box(1130, 618, 640, 110, '#dde9cf', 14);
+        wrap('Approved. Check the dashboard afterward.', 1160, 662, 575, 29, C.green, 1.2);
+      });
+    });
   } else if (index === 7) {
-    enter(local, .05, () => { box(100, 335, 1000, 470, C.pale, 24); smallHeading('REPEAT THE ORIGINAL CHECK · EXAMPLE', 140, 400); text('Can the application', 140, 493, 53, C.ink, 600); text('reach the service now?', 140, 559, 53, C.ink, 600); if (local > .8) { circle(167, 652, 29, C.green); tick(167, 652, C.lime, 1.1); text('Connection successful', 220, 665, 38, C.green, 600); } wrap('Report what changed, the test result, and anything still unresolved.', 140, 748, 895, 27); });
+    enter(local, .05, () => {
+      box(100, 335, 1000, 470, C.pale, 24);
+      smallHeading('IOT DASHBOARD · SAME DEVICE', 140, 400);
+      text('New reading received', 140, 507, 57, C.ink, 600);
+      enter(local, .8, () => {
+        circle(170, 625, 28, C.green); tick(170, 625, C.lime, 1.1);
+        text('10:43:12 · 44 W', 230, 642, 50, C.green, 600, true);
+      });
+      wrap('The new value matches the collector’s latest reading.', 140, 740, 895, 30);
+    });
     enter(local, .4, () => { terminal(1160, 335, 660, 470, 'LOCAL AUDIT TRAIL · EXAMPLE'); const rows = ['Approval decision', 'Operation + target', 'File change hashes', 'Bytes collected / sent', 'Outcome']; rows.forEach((row, i) => enter(local, .9 + i * .45, () => { tick(1210, 443 + i * 65, C.lime, .65); text(row, 1245, 454 + i * 65, 27, C.white); })); });
   } else if (index === 8) {
-    enter(local, .05, () => { smallHeading('OPEN SOURCE. HUMAN PERMISSION.', 100, 224); text('Diagnose and fix.', 100, 367, 101, C.ink, 600); text('With your AI agent.', 100, 484, 92, C.green, 500); text('npx @masstensor/diagnose@latest agent codex', 105, 600, 29, C.ink, 500, true); text('diagnose.fenginwind.com', 105, 691, 32, C.green); });
-    enter(local, .3, () => { terminal(1270, 255, 550, 460, "USER'S LOCAL CONTROLS"); command('> permissions ask', 1310, 410, local, .6, 28); text('Revoke automatic permissions', 1310, 465, 25, C.dim); command('> Ctrl+C', 1310, 561, local, 1.4, 32); text('End the probe', 1310, 614, 26, C.dim); });
-    enter(local, .6, () => { pill('MIT LICENSE', 1300, 747, 215); pill('USER CONTROL', 1535, 747, 255); });
+    enter(local, .05, () => {
+      smallHeading('OPEN SOURCE REMOTE DIAGNOSIS', 100, 224);
+      text('Start your first', 100, 367, 101, C.ink, 600);
+      text('diagnosis.', 100, 484, 101, C.green, 500);
+      text('diagnose.fenginwind.com/guide/', 105, 637, 40, C.green);
+    });
+    enter(local, .3, () => {
+      box(1170, 255, 650, 488, C.pale, 23);
+      smallHeading('CHOOSE HOW TO START', 1210, 324);
+      text('Manual agent mode', 1210, 414, 40, C.ink, 600);
+      text('Describe the problem in chat.', 1210, 469, 30, C.muted);
+      line(1210, 530, 1780, 530, '#c4d1b8');
+      text('Start with a procedure', 1210, 620, 40, C.ink, 600);
+      text('--skill ./device.md', 1210, 681, 32, C.green, 500, true);
+    });
   }
   c.restore();
   const cue = cues.find(value => time >= value.start && time < value.end) ?? cues.filter(value => value.start >= scene.start && value.start <= time).at(-1);

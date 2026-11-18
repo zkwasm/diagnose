@@ -74,4 +74,4 @@ Commands run with the current user's OS permissions. Diagnose neither provides a
 
 The public relay is hosted at `diagnose.fenginwind.com`. You can self-host using the deployment templates in the repository. Keep local credentials, hardware logs, firmware, and resource journals out of server deployments and public packages.
 
-The [one-minute English walkthrough](https://diagnose.fenginwind.com/#walkthrough) covers the current agent launcher, local permissions, encrypted transport, investigation, authorized repair, and verification. It includes English narration and captions. The port-mismatch repair is an illustrative example, not a live diagnosis. The earlier Chinese video is retained separately.
+The English walkthrough illustrates a USB gateway diagnosis, from sharing a nine-letter invitation to confirming that fresh readings reach the dashboard. It shows the native agent skill and includes narration and captions. [Watch the one-minute walkthrough](https://diagnose.fenginwind.com/#walkthrough)

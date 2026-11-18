@@ -2,64 +2,64 @@
   {
     "start": 0,
     "end": 5,
-    "title": "From a problem to a checked result.",
-    "subtitle": "Remote troubleshooting with your AI agent",
-    "voice": "A remote problem. Your AI agent. A clear path from diagnosis to resolution."
+    "title": "The gateway is on. Readings stopped.",
+    "subtitle": "An IoT gateway is connected to a computer on site",
+    "voice": "The gateway has power, but new readings stopped. Diagnose lets your AI investigate remotely."
   },
   {
     "start": 5,
-    "end": 12,
-    "title": "Start on the user's computer.",
-    "subtitle": "Node.js 22.18+ · No AI account needed on this side",
-    "voice": "The user starts Diagnose and shares a short-lived pairing code privately. Our guide explains how to install Node first."
+    "end": 13,
+    "title": "Connect the device and start the probe",
+    "subtitle": "On-site computer · USB data cable · Node.js 20.10 or later",
+    "voice": "On site, connect the gateway by USB and start the probe. Choose permissions, then share the nine-letter invitation privately."
   },
   {
-    "start": 12,
-    "end": 19,
-    "title": "Bring the agent you already use.",
-    "subtitle": "Codex · Claude Code · Gemini CLI",
-    "voice": "Launch Codex, Claude Code, or Gemini with Diagnose. Remote tools load for this session, without permanent setup."
+    "start": 13,
+    "end": 21,
+    "title": "Start in the agent you already use",
+    "subtitle": "One-time native skill installation · Codex, Claude Code, or Gemini CLI",
+    "voice": "Install the Diagnose skill once. In your agent, invoke it and paste the invitation with a description of the problem."
   },
   {
-    "start": 19,
-    "end": 26,
-    "title": "The user chooses the permissions.",
-    "subtitle": "Check the self-reported label and session fingerprint",
-    "voice": "The user confirms the connection locally. Review each task, or explicitly allow automatic execution and transmission for this session."
+    "start": 21,
+    "end": 27,
+    "title": "The on-site user controls access",
+    "subtitle": "The probe shows a confirmation prompt when the chosen mode requires it",
+    "voice": "Here, the user confirms the connection once. Tasks and results proceed under their chosen permission mode."
   },
   {
-    "start": 26,
+    "start": 27,
     "end": 33,
-    "title": "Encrypted between the endpoints.",
-    "subtitle": "The relay forwards ciphertext, not readable commands or results",
-    "voice": "Commands and results are encrypted between the endpoints. The relay sees connection metadata. Your chosen AI provider can see the results."
+    "title": "The computer connects the agent to the device",
+    "subtitle": "The relay forwards encrypted commands and results between the two computers",
+    "voice": "An encrypted relay connects the computers. The probe is now reachable. The agent still needs to check the gateway."
   },
   {
     "start": 33,
     "end": 41,
-    "title": "Investigate. Then explain the fix.",
-    "subtitle": "Illustrative example: an application cannot reach its local service",
-    "voice": "The agent collects evidence and finds a port mismatch. It explains the proposed configuration change, its impact, and how to restore the original."
+    "title": "Check the gateway and follow the evidence",
+    "subtitle": "Read-only investigation · Inspect the port, sample output, then read the collector settings",
+    "voice": "The gateway is sending readings on its current USB port, but the collector still uses the old port. The agent explains the mismatch."
   },
   {
     "start": 41,
     "end": 48,
-    "title": "Carry out the authorized repair.",
-    "subtitle": "Commands, scripts, files, live terminals, networks, and connected devices",
-    "voice": "With permission, the agent applies the fix. Terminals, files, networks, and device tools support deeper work."
+    "title": "Apply one authorized correction",
+    "subtitle": "Update the on-site collector setting after reviewing the change",
+    "voice": "The site user agrees to update the collector's port. The agent records the old setting and applies the correction."
   },
   {
     "start": 48,
     "end": 55,
-    "title": "Check the original problem again.",
-    "subtitle": "A command finishing is not proof that the problem is solved",
-    "voice": "Repeat the failing check, then summarize the result. Local audit events record actions, changes, and data transfers."
+    "title": "Check the reading in the dashboard",
+    "subtitle": "Repeat the original check and confirm a fresh device value arrives",
+    "voice": "A new gateway reading reaches the dashboard. The agent reports what changed and the user can review the local audit history."
   },
   {
     "start": 55,
     "end": 60,
-    "title": "Diagnose and fix. Remotely.",
-    "subtitle": "Open source. Human permission.",
-    "voice": "The user can revoke access anytime. Diagnose and fix, with your AI agent."
+    "title": "Start your first diagnosis",
+    "subtitle": "User guide and device walkthroughs",
+    "voice": "Try a manual session first. For repeat work, launch with a device procedure."
   }
 ]

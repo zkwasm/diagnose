@@ -50,7 +50,8 @@ for (const guide of guides) {
 }
 await writeFile(join(out, 'robots.txt'), 'User-agent: *\nAllow: /\nSitemap: https://diagnose.fenginwind.com/sitemap.xml\n');
 await writeFile(join(out, 'sitemap.xml'), '<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>https://diagnose.fenginwind.com/</loc></url>' + guides.map(({ url }) => '<url><loc>https://diagnose.fenginwind.com' + url + '</loc></url>').join('') + '</urlset>');
-const assets = await Promise.all(['style.css', 'site.js'].map(async name => ({ name, version: createHash('sha256').update(await readFile(join(out, name))).digest('hex').slice(0, 12) })));
+const versionedAssets = ['style.css', 'site.js', 'media/diagnose-agent-en-60s.mp4', 'media/diagnose-agent-en-poster.png', 'media/diagnose-agent-en.vtt'];
+const assets = await Promise.all(versionedAssets.map(async name => ({ name, version: createHash('sha256').update(await readFile(join(out, name))).digest('hex').slice(0, 12) })));
 for (const page of ['index.html', ...guidePages]) {
   const path = join(out, page);
   let html = await readFile(path, 'utf8');

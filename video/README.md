@@ -4,9 +4,9 @@ A 60-second, 1920×1080, 30 fps animation for Diagnose's current positioning:
 
 > Diagnose and fix problems remotely with your AI agent.
 
-The nine scenes cover the reported problem, the user's probe, the session agent launcher, local permissions, endpoint encryption, investigation and repair planning, authorized changes, verification and audit, and local revocation.
+The nine scenes follow a USB gateway diagnosis. They show the on-site probe, the nine-letter invitation, manual agent mode with the native skill, pairing progress, and verification of an authorized correction. The closing screen points to both manual mode and the launcher with a device procedure.
 
-The repair story is explicitly illustrative: an application uses port 8081 while its service listens on 8080. No real user's computer, credentials, device, or diagnostic data is accessed while rendering. The video does not imply automatic repair success or general automatic rollback.
+In the illustrative scenario, a collector has an outdated USB serial port setting. The animation uses fictional readings and shows how a fresh value in the dashboard verifies the fix.
 
 ## Outputs
 

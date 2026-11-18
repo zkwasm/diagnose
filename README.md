@@ -2,7 +2,7 @@
 
 **Diagnose and fix problems remotely with your AI agent.**
 
-Diagnose is an open-source tool for agent-led remote troubleshooting and problem resolution. It gives Codex, Claude Code, Gemini CLI, or another MCP client the remote tools to investigate gateways, controllers and other devices reachable from an on-site computer, apply authorized fixes, and verify the result. A user-controlled probe and an end-to-end encrypted relay provide the connection.
+Diagnose is an open-source tool for agent-led remote troubleshooting and problem resolution. It gives Codex, Claude Code, Gemini CLI, or another MCP client the remote tools to investigate gateways, controllers and other devices reachable from an on-site computer, apply authorized fixes, and verify the result. A user-controlled probe and an end-to-end encrypted relay provide the connection. Launch with a reusable Markdown diagnostic skill to start the investigation automatically. The agent uses the procedure and the evidence it collects to decide what to check next.
 
 [Quick start](USER_GUIDE.md#quick-start) · [Diagnostic walkthroughs](docs/guide/examples.md) · [npm](https://www.npmjs.com/package/@masstensor/diagnose) · [Website](https://diagnose.fenginwind.com)
 
@@ -45,7 +45,7 @@ The user grants permission locally, either when the connection arrives or in adv
 
 ### Start automatically with a device procedure
 
-If you have a Markdown procedure, pass its path when launching the agent:
+Pass a Markdown skill for the device or recurring fault when launching the agent. It starts the procedure automatically, asks for missing connection details, and uses evidence to guide follow-up checks and verify authorized repairs.
 
 ```sh
 npx @masstensor/diagnose@latest agent codex --skill ./device.md

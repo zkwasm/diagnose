@@ -1,6 +1,6 @@
 # Reuse and improve diagnostic procedures
 
-Start an agent with a device-specific Markdown procedure, keep a case from a real diagnosis, and review improvements before adding them to your library.
+Launch an agent with a device-specific Markdown skill so it starts the diagnostic procedure automatically. Keep the evidence in a case and review the agent’s proposed improvements before using them in another diagnosis.
 
 [All guide scenarios](../../USER_GUIDE.md)
 
@@ -35,7 +35,7 @@ skills/my-device/
 
 The launcher reads and validates the entry before starting the agent, saves a private `0600` session snapshot with its source path, reference directory, and SHA-256, and supplies an initial task to read that snapshot and begin. The instruction text is not placed in process arguments. The adapter adds only the private task subdirectory to the agent's session working directories so its file tools can read the snapshot. Gemini's temporary settings and login links are outside that task subdirectory. The original skill directory is not automatically added; reading its references may still require the agent's normal local permission. The snapshot is removed when the launcher exits normally or handles termination. An uncatchable kill or power loss can leave temporary files behind.
 
-The agent follows the entry, reads references as needed, and works toward diagnosis, authorized repair, and verification. If a pairing code, target identity, or necessary detail is missing, it asks before continuing. Do not store pairing codes, credentials, or other secrets in reusable task files; selected instructions and referenced material that the agent reads can enter the AI provider's context.
+The agent follows the entry, reads references as needed, and uses each result to decide what to check next. For an OWON gateway that stopped reporting, a skill might first check for a fresh plug reading in the serial logs, then check whether the same reading reaches the dashboard. After an authorized fix, the agent repeats the check that showed the fault. If a pairing code, target identity, or necessary detail is missing, it asks before continuing. Do not store pairing codes, credentials, or other secrets in reusable task files; selected instructions and referenced material that the agent reads can enter the AI provider's context.
 
 Starting with Diagnose 0.8.2, the launcher chooses Chinese or English for the startup prompt using the diagnostician computer's language settings. Other languages fall back to English. The Markdown procedure stays in its original language. You can ask the agent to use a different language in chat.
 

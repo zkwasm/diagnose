@@ -1,6 +1,6 @@
 # Diagnose user guide
 
-Diagnose lets a remote AI agent inspect and troubleshoot a device through a computer on site. The person on site connects the equipment and controls access. The diagnostician runs the AI agent on their own computer. An encrypted relay connects the two computers.
+Diagnose lets a remote AI agent inspect and troubleshoot a device through a computer on site. The person on site connects the equipment and controls access. The diagnostician runs the AI agent on their own computer. An encrypted relay connects the two computers. Start in chat for a new problem, or load a diagnostic skill at launch so the agent begins with the checks for that device or fault.
 
 ## Choose your scenario
 
@@ -89,7 +89,7 @@ npx @masstensor/diagnose@latest agent codex --skill ./device.md
 # Or replace codex with claude or gemini.
 ```
 
-The agent loads the procedure and starts working through it. If it needs an invitation, share it in the agent conversation. The same on-site permissions apply in both modes. See [how to prepare a device procedure](docs/guide/procedures.md#start-with-a-device-skill-or-markdown-task).
+The agent loads the procedure at startup, runs the first checks when it has access, and uses the results to choose its next step. If it needs an invitation, share it in the agent conversation. The same on-site permissions apply in both modes. See [how to prepare a device procedure](docs/guide/procedures.md#start-with-a-device-skill-or-markdown-task).
 
 ### 4. Approve, diagnose, and finish
 

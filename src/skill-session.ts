@@ -4,7 +4,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import { fileURLToPath } from 'node:url';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
-import { relayUrl } from './peer.js';
+import { pairingProgress, relayUrl } from './peer.js';
 import { DEFAULT_IDLE_MS } from './session-limits.js';
 
 const cli = fileURLToPath(new URL('./cli.js', import.meta.url));
@@ -115,7 +115,12 @@ async function serve(relay: string): Promise<void> {
         activity = true;
         refreshIdle();
       }
-      const result = await client.callTool({ name, arguments: args }, undefined, { timeout: requestMs });
+      const result = await client.callTool({ name, arguments: args }, undefined, {
+        timeout: requestMs,
+        ...(name === 'diagnose_pair' && { onprogress: ({ progress }) => {
+          if (progress < pairingProgress.length && process.connected) process.send?.({ progress }, () => {});
+        } }),
+      });
       if (result.isError) {
         const content = result.content;
         const error = Array.isArray(content) ? content.find(item => item.type === 'text')?.text : undefined;
@@ -185,6 +190,7 @@ async function open(input: Json): Promise<Json> {
   if (input.relay !== undefined && typeof input.relay !== 'string') throw new Error('Invalid relay URL');
   const relay = input.relay ?? defaultRelay;
   relayUrl(relay);
+  console.error('Connecting to the Diagnose relay.');
   const worker = fork(cli, ['skill-session', '_serve', relay], { detached: true, windowsHide: true, stdio: ['ignore', 'ignore', 'ignore', 'ipc'] });
   try {
     const session = await new Promise<Endpoint>((resolve, reject) => {
@@ -207,9 +213,15 @@ async function open(input: Json): Promise<Json> {
       worker.once('exit', exited);
       worker.once('message', ready);
     });
+    worker.on('message', (message: { progress?: number }) => {
+      if (typeof message.progress !== 'number') return;
+      const text = pairingProgress[message.progress - 1];
+      if (text) console.error(text);
+    });
+    const result = await requestSession(session, 'pair', { code: input.code, label: input.label });
+    console.error(pairingProgress[2]);
     worker.disconnect();
     worker.unref();
-    const result = await requestSession(session, 'pair', { code: input.code, label: input.label });
     return { ...result, session: session.port + '.' + session.secret, idleSeconds: DEFAULT_IDLE_MS / 1000 };
   } catch (error) {
     worker.kill();

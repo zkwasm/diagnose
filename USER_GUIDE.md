@@ -83,7 +83,7 @@ The agent loads the procedure and starts working through it. If it needs an invi
 
 Unless the on-site user chose **Approve everything**, they check the diagnostician's label and connection fingerprint before approving. The probe shows which permissions each choice grants. Auto approval covers both execution and result transmission. Commands run with the user's OS permissions, and results can reach the diagnostician and their AI provider.
 
-Ask the agent to start with a read-only check, explain what it finds, and verify the original symptom after any authorized repair. See [what the skill can do](docs/guide/diagnose.md#what-the-native-skill-can-do) and [a worked diagnosis example](docs/guide/diagnose.md#from-a-reported-problem-to-a-verified-result).
+The agent reports [pairing status and the first device check](docs/guide/diagnose.md#run-a-diagnostic-session) separately. Ask it to start with a read-only check, explain what it finds, and verify the original symptom after any authorized repair. See [what the skill can do](docs/guide/diagnose.md#what-the-native-skill-can-do) and [a worked diagnosis example](docs/guide/diagnose.md#from-a-reported-problem-to-a-verified-result).
 
 The user can type `permissions ask` to revoke automatic approval or `exit` to stop access. See [how to review what was collected and sent](docs/guide/troubleshooting.md#review-local-history-and-clean-up).
 

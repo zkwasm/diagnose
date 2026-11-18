@@ -17,13 +17,15 @@ Tell the user you are requesting the connection. The on-site user approves it if
 {"code":"<user-shared invitation>","label":"<diagnostician and AI provider>","relay":"https://diagnose.fenginwind.com"}
 ```
 
-Allow up to 160 seconds for npm startup and on-site approval. Report a connection only after the helper returns `connected: true`. If pairing is declined or fails, stop and report it. Never put the invitation in command arguments, files, or summaries. After pairing, ask for any missing device or symptom details before requesting diagnostic operations.
+Allow up to 160 seconds for npm startup and on-site approval. If your shell tool supports streaming or background execution, follow the same process so you can relay its stderr progress while it waits. Report that the probe is waiting for acceptance only after the helper reports an authenticated probe. Ask the on-site user to approve only if prompted. If the shell tool only returns output at exit, say that the connection request is in progress. Do not start a second pairing attempt while the first is pending. Report a connection only after the helper returns `connected: true`. If pairing is declined or fails, stop and report the last confirmed stage and the error. Never put the invitation in command arguments, files, or summaries.
 
 The helper keeps the connection across shell calls and chat turns. Use its returned `session` handle only through stdin to later calls. Do not print it back to the user or save it. A temporary session expires after six hours without diagnostic activity by default. Task requests and result polls renew the idle timer. The on-site probe may have a different configured limit.
 
 The helper cannot grant probe-side permissions. A local agent sandbox or workspace trust rule may also require permission to run the helper or use the network.
 
 ## First check after pairing
+
+Report that the on-site probe is connected. Assess the target separately. Ask for the symptom, target, or connection method if it is required to pick a relevant first check. Start with an agreed read-only check suited to that connection. For a known log or status utility, use that directly. For USB serial, determine the port before capturing output. Use one batch for related read-only operations when the inputs and order are already known.
 
 If you need to identify the host or an attached serial device, submit `system.inspect` through the MCP tool `diagnose_start`. Run `node <this-skill-directory>/scripts/run.mjs call` and pass this JSON on stdin:
 
@@ -37,7 +39,9 @@ Use the returned task ID in a second call:
 {"session":"<handle>","tool":"diagnose_wait","arguments":{"id":"<task-id>","timeoutMs":10000}}
 ```
 
-If pending, poll the same task ID. Check the result status and use only relevant fields, such as the OS and `serialPorts`. An empty list only means no visible serial ports were reported. If several interfaces could be the device, ask which one to use before opening it. When the user already gave an exact file or interface and host discovery adds nothing, start with that specific read-only check instead.
+If pending, poll the same task ID. Check the result status and use only relevant fields, such as the OS and `serialPorts`. Treat visible ports as candidates. Confirm the target with an exact path supplied by the user or evidence that identifies the interface. If it remains ambiguous, ask before opening a port. For capture, use the confirmed baud rate and a short sampling window. Opening a port can affect some devices, so check before opening a port on equipment where this matters.
+
+After the first check, report what is confirmed, what remains uncertain, and the next check you propose. Distinguish a connected probe, a confirmed device interface, and an observed response attributable to the target. A port listing or a silent capture does not establish device health. Give concrete evidence, such as the port and a recognizable device log line or the requested reading. If the result is ambiguous or empty, choose a follow-up check or ask the user for the specific detail needed to continue.
 
 ## Keep diagnosing across rounds
 

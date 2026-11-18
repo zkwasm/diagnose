@@ -11,7 +11,7 @@ Use this guide if a person on site has shared a nine-letter invitation. Choose t
 
 ## Use Diagnose as a native agent skill
 
-Install the skill once through your agent's GitHub installation flow. All three agents use the same `skills/connect/` directory in the repository. The helper runs Diagnose 0.8.0 locally on demand with `npx` and needs Node.js 20.10 or later. There is no separate global Diagnose CLI installation for this workflow.
+Install the skill once through your agent's GitHub installation flow. All three agents use the same `skills/connect/` directory in the repository. The helper runs Diagnose 0.8.1 locally on demand with `npx` and needs Node.js 20.10 or later. There is no separate global Diagnose CLI installation for this workflow.
 
 ### Claude Code
 
@@ -46,7 +46,15 @@ Approve the installation prompt. In a new session, ask Gemini to use the `connec
 
 ## Run a diagnostic session
 
-Give the agent the invitation, device model, connection method, and symptom. The person on site confirms the connection if their startup mode requires it. The skill keeps the connection available for follow-up between messages. Ask the agent to close it when you are done, or have the on-site user stop the probe. See [session timeouts](automation.md#limits-and-timeouts) for details.
+Give the agent the invitation, device model, connection method, and symptom. During pairing, the helper reports when it reaches the relay, authenticates the on-site probe and waits for acceptance, and confirms the pairing. The person on site approves the connection if prompted. When the agent's shell tool streams output, it can share these updates while pairing is still in progress.
+
+After pairing, look for three separate results:
+
+1. **Probe connected.** The agent can submit permitted checks on the on-site computer.
+2. **Device interface identified.** The agent has evidence for which port or interface belongs to the device. If several ports could match, it asks you to confirm before opening one.
+3. **Device response observed.** The agent reports a recognizable log line, a status reply, or another observation attributable to the device. A silent capture leaves this step unconfirmed.
+
+The agent explains what it found in the first check and what it will check next. The skill keeps the connection available for follow-up between messages. Ask the agent to close it when you are done, or have the on-site user stop the probe. See [session timeouts](automation.md#limits-and-timeouts) for details.
 
 ## What the native skill can do
 

@@ -7,6 +7,11 @@ import { InvitationHost, InvitationJoin } from './short-pairing.js';
 import { LEGACY_RELAY_MAX_MS } from './session-limits.js';
 
 export type PeerOptions = { role: 'host' | 'join'; code: string; relay: string; label?: string; remember?: boolean; provision?: () => string | undefined; accept?: (peer: { label: string; fingerprint: string; signal: AbortSignal; remember: boolean }) => Promise<boolean>; approvalTimeoutMs?: number; sessionMs?: number; invitationMs?: number };
+export const pairingProgress = [
+  'Connected to the relay. Verifying the on-site probe.',
+  'Authenticated the on-site probe. Waiting for it to accept the connection. Approve on site if prompted.',
+  'Paired with the on-site probe.',
+] as const;
 function deferred<T>() { let resolve!: (value: T) => void; let reject!: (error: Error) => void; const promise = new Promise<T>((a, b) => { resolve = a; reject = b; }); promise.catch(() => {}); return { promise, resolve, reject }; }
 export function relayUrl(value: string): string {
   const url = new URL(value);
@@ -57,7 +62,10 @@ export class Peer extends EventEmitter {
     this.ws = new WebSocket(relayUrl(options.relay), { maxPayload: MAX_FRAME, perMessageDeflate: false, handshakeTimeout: 10000 });
     this.connectionTimer = setTimeout(() => this.close('Relay registration timeout'), 12000);
     if (short && options.role === 'host') this.invitationTimer = setTimeout(() => this.close('Invitation expired; generate a new code'), Math.min(options.invitationMs ?? INVITATION_MS, INVITATION_MS));
-    this.ws.on('open', () => this.ws.send(JSON.stringify({ version: short ? 2 : 1, role: options.role, room })));
+    this.ws.on('open', () => {
+      this.ws.send(JSON.stringify({ version: short ? 2 : 1, role: options.role, room }));
+      if (options.role === 'join') this.emit('pairing-progress', 1);
+    });
     this.ws.on('error', () => this.close('Relay connection failed'));
     this.ws.on('close', (_code, reason) => {
       const message = reason.toString();
@@ -138,6 +146,7 @@ export class Peer extends EventEmitter {
         })().catch(() => this.close('Pairing approval failed'));
       } else {
         this.cipher = this.handshake.split(); this.handshake = undefined; this.fingerprint = this.cipher.fingerprint;
+        this.emit('pairing-progress', 2);
       }
       return;
     }

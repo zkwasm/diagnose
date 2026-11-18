@@ -11,12 +11,12 @@ import { Peer } from '../dist/peer.js';
 import { ProbeEngine } from '../dist/engine.js';
 import { Audit } from '../dist/util.js';
 
-function helper(action: string, input: Record<string, unknown>): Promise<Record<string, any>> {
+function helper(action: string, input: Record<string, unknown>, onProgress?: (stderr: string) => void): Promise<Record<string, any>> {
   const script = process.env.DIAGNOSE_TEST_SKILL ?? resolve('skills/connect/scripts/run.mjs');
   const child = spawn(process.execPath, [script, action], { stdio: 'pipe' });
   let out = '', err = '';
   child.stdout.setEncoding('utf8').on('data', text => { out += text; });
-  child.stderr.setEncoding('utf8').on('data', text => { err += text; });
+  child.stderr.setEncoding('utf8').on('data', text => { err += text; onProgress?.(err); });
   child.stdin.end(JSON.stringify(input));
   return new Promise((resolve, reject) => {
     child.on('error', reject);
@@ -36,13 +36,21 @@ test('native Skill helper pairs once, runs a shell command, reuses the connectio
   const url = 'ws://127.0.0.1:' + await relay.listen();
   const code = createInvitation();
   let pairs = 0;
+  let approve!: (value: boolean) => void;
+  const approval = new Promise<boolean>(resolve => { approve = resolve; });
   const approvals: Array<string> = [];
-  const host = new Peer({ role: 'host', code, relay: url, accept: async () => { pairs++; return true; } });
+  const host = new Peer({ role: 'host', code, relay: url, approvalTimeoutMs: 5000, accept: async () => { pairs++; return approval; } });
   new ProbeEngine(host, async request => { approvals.push(request.stage); return true; }, new Audit(join(scratch, 'audit')));
   let session: string | undefined;
   try {
     await host.open();
-    const opened = await helper('open', { code, label: 'Skill test', relay: url });
+    let progress = '';
+    const opened = await helper('open', { code, label: 'Skill test', relay: url }, stderr => {
+      progress = stderr;
+      if (stderr.includes('Waiting for it to accept the connection')) approve(true);
+    });
+    assert.match(progress, /Connecting to the Diagnose relay\.[\s\S]+Connected to the relay\.[\s\S]+Authenticated the on-site probe\.[\s\S]+Paired with the on-site probe\./);
+    assert.ok(!progress.includes(code));
     assert.equal(opened.connected, true);
     assert.equal(opened.idleSeconds, 6 * 60 * 60);
     session = opened.session;

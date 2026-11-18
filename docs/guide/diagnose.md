@@ -48,18 +48,32 @@ Approve the installation prompt. In a new session, ask Gemini to use the `connec
 
 Give the agent the invitation, device model, connection method, and symptom. The person on site confirms the connection if their startup mode requires it. The skill keeps the connection available for follow-up between messages. Ask the agent to close it when you are done, or have the on-site user stop the probe. See [session timeouts](automation.md#limits-and-timeouts) for details.
 
+## What the native skill can do
+
+The agent uses these operations on the **on-site computer** through the probe. To reach the device, it uses the serial interface or an available device utility on that computer.
+
+| What you can ask the agent to do | Operation |
+| --- | --- |
+| Identify the on-site OS and list visible serial ports. | `system.inspect` |
+| Find a known log or configuration file, inspect its metadata, and read the relevant contents. | `file.list`, `file.stat`, `file.read` |
+| Capture output from a confirmed serial port at the device's baud rate. | `serial.capture` |
+| Send a documented request to the device over serial and read its reply. | `serial.exchange` |
+| Run a finite check with an installed program, such as a vendor utility that reports device status. | `process.run` |
+| Apply an authorized configuration edit to a file on the on-site computer. | `file.write` |
+
+The agent submits one operation with `diagnose_start` or groups related operations with `diagnose_batch`. It uses `diagnose_wait` to get the result and `diagnose_cancel` to request cancellation of work in progress. Cancellation does not undo changes already made. You can describe the check in plain language. The agent selects the operation and waits for any approval the probe requires.
+
+The native skill supports temporary pairing and finite operations. For live terminals, file transfers, remembered pairings, or case management, [launch the agent with Diagnose MCP](automation.md#launch-an-agent-with-diagnose-mcp). A [device procedure](procedures.md#start-with-a-device-skill-or-markdown-task) can tell the agent which checks and verification steps to use for a particular model.
+
 ## From a reported problem to a verified result
 
-For a device session, work toward an observable device outcome:
+Suppose plug readings stopped arriving from an OWON gateway connected by USB serial. Start with a prompt like this:
 
-1. **Describe the problem.** Identify the device model, its connection to the on-site computer, what fails, and what you expected. Agree on the check that will show whether the problem is resolved.
-2. **Investigate first.** Ask the agent to identify the available interface and tools, then inspect device logs, network responses, or other relevant evidence. Distinguish confirmed facts from possible causes.
-3. **Review a repair plan.** Have the agent explain what it intends to change, why, the expected impact, and any recovery option. Where practical, preserve the original configuration before editing it.
-4. **Apply authorized changes.** The agent can use commands, scripts, file edits, and device tools under the user's existing permission mode. Only proceed within the agreed scope.
-5. **Verify the result.** Check the device itself: repeat the failing exchange, observe new readings, or run its supported health check. Ask for a summary of what changed, the verification evidence, and anything still unresolved. An executed command alone does not establish that the user's problem is fixed.
+> The OWON gateway stopped reporting plug readings. Start with read-only checks. Confirm which serial port belongs to the gateway, look for recent readings or errors, and tell me what the evidence supports. Ask before changing anything. We’ll consider it fixed when fresh readings appear again.
 
-These are instructions for directing the agent, not a separate enforced plan-approval system. The [probe permissions](on-site.md#choose-and-change-permissions) still apply. Automatic mode continues to allow execution and transmission under the user's grant; general automatic rollback is not provided.
+1. **Identify the interface.** The agent can list serial ports with `system.inspect`. If several ports match, confirm the right one and the baud rate with the person on site before opening it.
+2. **Collect a baseline and follow the evidence.** Use `serial.capture` for a short sample. If the sample is silent, check whether the port, baud rate, or cable is correct. If the gateway responds but readings are still absent, inspect the relevant collector logs with `file.read` if available. Reuse the same session to ask for another check.
+3. **Review one proposed change.** If the evidence points to a setting, ask the agent to show the current value, explain the proposed edit, and describe how to restore the original value. The [probe's permissions](on-site.md#choose-and-change-permissions) govern execution and result sharing. You can end the diagnosis after the read-only findings.
+4. **Repeat the original check.** After an authorized repair, use the same capture or status check to look for fresh readings. If they are still missing, use that result to choose the next check. Ask the agent to summarize the evidence, changes, and any remaining uncertainty.
 
-You can also request a read-only investigation and stop after the explanation. The on-site computer’s drivers, software, configuration, and network can also be investigated when they are part of the problem; successful fixes depend on the issue, available access, and the user's authorization.
-
-The native skill supports temporary pairing and finite diagnostics, including serial operations. For remembered devices, live terminals, or cases, use the [agent launcher](automation.md#launch-an-agent-with-diagnose-mcp).
+Tell the agent when to stop. The on-site user can also end access from the probe terminal. Use the same workflow for a problem on the on-site computer itself. Pick a check that measures whether the original symptom is gone, such as a successful application start or a working device connection.

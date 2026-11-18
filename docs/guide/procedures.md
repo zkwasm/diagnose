@@ -37,6 +37,8 @@ The launcher reads and validates the entry before starting the agent, saves a pr
 
 The agent follows the entry, reads references as needed, and works toward diagnosis, authorized repair, and verification. If a pairing code, target identity, or necessary detail is missing, it asks before continuing. Do not store pairing codes, credentials, or other secrets in reusable task files; selected instructions and referenced material that the agent reads can enter the AI provider's context.
 
+Starting with Diagnose 0.8.2, the launcher chooses Chinese or English for the startup prompt using the diagnostician computer's language settings. Other languages fall back to English. The Markdown procedure stays in its original language. You can ask the agent to use a different language in chat.
+
 Relative references resolve against the original entry directory, not the temporary snapshot. Keep that directory available during the session. Only the entry is snapshotted; referenced files are read from the original directory. Scripts are not executed by the launcher merely because they exist. The agent runs them only as required by the task and existing permissions.
 
 Referenced scripts initially live on the diagnostician computer. To use one remotely, the agent must explicitly submit its contents or transfer it to the user's computer with authorization. A path on one endpoint is not automatically a path on the other.

@@ -4,7 +4,18 @@ import { mkdtemp, mkdir, writeFile, realpath } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
-import { loadSkill } from '../dist/skill.js';
+import { loadSkill, promptLanguage, skillPrompt } from '../dist/skill.js';
+
+test('startup prompts follow the local message locale and fall back to English', async () => {
+  assert.equal(await promptLanguage({ LC_ALL: 'zh_CN.UTF-8', LC_MESSAGES: 'en_US.UTF-8' }), 'zh');
+  assert.equal(await promptLanguage({ LC_ALL: 'C.UTF-8', LC_MESSAGES: 'zh-Hant-TW' }), 'zh');
+  assert.equal(await promptLanguage({ LC_ALL: 'fr_FR.UTF-8' }), 'en');
+  const path = 'local path with spaces.json';
+  assert.match(skillPrompt(path, 'en'), /Use English for questions and reports/);
+  const chinese = skillPrompt(path, 'zh', 'workshop-laptop');
+  assert.ok(chinese.includes(JSON.stringify(path)));
+  assert.match(chinese, /workshop-laptop.+无需索取邀请码/);
+});
 
 test('skill loader accepts UTF-8 Markdown and preserves exact instructions and source base', async () => {
   const root = await realpath(await mkdtemp(join(tmpdir(), 'diagnose skill '))), file = join(root, process.platform === 'win32' ? 'device with spaces.md' : 'device "quoted".md'), source = '\uFEFF# Device\nCheck port 11500. Literal $(do-not-execute).\n';

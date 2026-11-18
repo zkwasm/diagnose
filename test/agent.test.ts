@@ -23,7 +23,7 @@ const fs=require('node:fs'), args=process.argv.slice(2), agent=require('node:pat
 if(agent==='codex'){const overrides=args.filter((_,i)=>args[i-1]==='-c');server={command:JSON.parse(overrides[0].split('=').slice(1).join('=')),args:JSON.parse(overrides[1].split('=').slice(1).join('='))};}
 else if(agent==='claude')server=JSON.parse(args[args.indexOf('--mcp-config')+1]).mcpServers.diagnose;
 else{settingsPath=require('node:path').join(process.env.GEMINI_CLI_HOME,'.gemini','settings.json');const settings=JSON.parse(fs.readFileSync(settingsPath,'utf8'));server=settings.mcpServers.diagnose;admin=settings.security; if(settings.mcpServers.existing.command!=='unchanged')throw Error('Existing MCP lost');}
-let task,taskPath,taskMode;const initial=agent==='gemini'?args[args.indexOf('--prompt-interactive')+1]:args.at(-1);if(initial?.includes('Task snapshot path (JSON):')){const marker=initial.split('\\n').find(x=>x.startsWith('Task snapshot path (JSON): '));taskPath=JSON.parse(marker.slice('Task snapshot path (JSON): '.length));task=JSON.parse(fs.readFileSync(taskPath,'utf8'));taskMode=fs.statSync(taskPath).mode&511;}
+let task,taskPath,taskMode;const initial=agent==='gemini'?args[args.indexOf('--prompt-interactive')+1]:args.at(-1);const marker=initial?.split('\\n').find(x=>x.startsWith('Task snapshot path (JSON): ')||x.startsWith('任务快照路径 (JSON): '));if(marker){taskPath=JSON.parse(marker.slice(marker.indexOf(': ')+2));task=JSON.parse(fs.readFileSync(taskPath,'utf8'));taskMode=fs.statSync(taskPath).mode&511;}
 const {Client}=await import(${JSON.stringify(client)}),{StdioClientTransport}=await import(${JSON.stringify(transport)});
 const client=new Client({name:'launcher-acceptance',version:'1'});await client.connect(new StdioClientTransport(server));const tools=(await client.listTools()).tools.map(t=>t.name);let workflow;
 if(process.env.TEST_PAIR_CODE){if(!task?.instructions.includes('STARTUP_WORKFLOW_ACCEPTANCE'))throw Error('Selected task was not read');const call=async(name,args)=>{const r=await client.callTool({name,arguments:args});if(r.isError)throw Error(r.content[0].text);return JSON.parse(r.content[0].text);};await call('diagnose_pair',{code:process.env.TEST_PAIR_CODE,label:'Explicitly authorized fixture agent'});const {id}=await call('diagnose_batch',{reason:'Selected startup task: fix and verify scratch configuration',steps:[{operation:'file.write',arguments:{path:process.env.TEST_REMOTE_TARGET,content:'fixed'}},{operation:'file.read',arguments:{path:process.env.TEST_REMOTE_TARGET}}]});workflow=await call('diagnose_wait',{id,timeoutMs:5000,release:true});await call('diagnose_disconnect',{});}
@@ -64,7 +64,7 @@ test('agent forwards termination and cleans the Gemini overlay', { skip: process
 for (const agent of ['codex', 'claude', 'gemini']) test(`agent ${agent} loads the same selected Markdown task at startup without exposing its body in argv`, { skip: process.platform === 'win32', timeout: 15000 }, async () => {
   const f = fixture(), source = join(f.root, 'device "profile".md'), body = '# Device task\nPRIVATE_TASK_MARKER\nRead references/profile.md and diagnose the selected device.\nLiteral $(do-not-execute).'; writeFileSync(source, body);
   new PairingStore(join(f.root, '.diagnose', 'pairings')).add({ role: 'operator', name: 'alice-pc', label: 'test', relay: 'https://relay.example.test', code: createCode() });
-  const result = await run(['agent', agent, '--device', 'alice-pc', '--skill', source, '--', '--model', 'selected-model'], { ...process.env, HOME: f.root, PATH: f.root + ':' + process.env.PATH, GEMINI_CLI_HOME: f.root, TEST_CAPTURE: f.capture });
+  const result = await run(['agent', agent, '--device', 'alice-pc', '--skill', source, '--', '--model', 'selected-model'], { ...process.env, LC_ALL: 'en_US.UTF-8', HOME: f.root, PATH: f.root + ':' + process.env.PATH, GEMINI_CLI_HOME: f.root, TEST_CAPTURE: f.capture });
   assert.equal(result.code, 0, result.output); const captured = JSON.parse(readFileSync(f.capture, 'utf8'));
   assert.deepEqual(captured.server.args.slice(-2), ['--device', 'alice-pc']); assert.match(captured.args.at(-1), /do not ask for a pairing code/);
   assert.equal(captured.task.instructions, body); assert.equal(captured.task.sourceFile, source); assert.equal(captured.task.baseDirectory, f.root); assert.equal(captured.taskMode, 0o600); assert.equal(existsSync(captured.taskPath), false); assert.ok(captured.tools.includes('diagnose_pair'));
@@ -75,6 +75,26 @@ for (const agent of ['codex', 'claude', 'gemini']) test(`agent ${agent} loads th
   assert.ok(!captured.args.join(' ').includes('PRIVATE_TASK_MARKER')); assert.ok(!result.output.includes('PRIVATE_TASK_MARKER')); assert.ok(captured.args.includes('selected-model'));
   const prompt = captured.args.at(-1); assert.match(prompt, /Start the remote troubleshooting task/); assert.match(prompt, /do not merely summarize/); assert.match(prompt, /approval/);
   if (agent === 'gemini') assert.equal(captured.args.at(-2), '--prompt-interactive'); else assert.equal(captured.args.at(-2), '--');
+});
+
+test('Codex receives a Chinese startup prompt while its Markdown task is preserved', { skip: process.platform === 'win32', timeout: 15000 }, async () => {
+  const f = fixture();
+  const source = join(f.root, 'device.md'), body = '# Device task\nCheck the attached port. 保留本文。\n';
+  writeFileSync(source, body);
+  const env = { ...process.env, LC_ALL: 'zh_CN.UTF-8', HOME: f.root, PATH: f.root + ':' + process.env.PATH, TEST_CAPTURE: f.capture };
+  const result = await run(['agent', 'codex', '--skill', source], env);
+  assert.equal(result.code, 0, result.output);
+  const captured = JSON.parse(readFileSync(f.capture, 'utf8'));
+  assert.match(captured.args.at(-1), /默认用中文提问和汇报/);
+  assert.match(captured.args.at(-1), /通过 diagnose_\* MCP 工具操作现场电脑/);
+  assert.equal(captured.task.instructions, body);
+  assert.ok(!captured.args.at(-1).includes(body));
+
+  const { Cases } = await import('../dist/cases.js');
+  const selected = new Cases(join(f.root, '.diagnose', 'cases')).create({ goal: 'Check device logs', target: { name: 'Gateway', interface: 'serial' } });
+  const caseResult = await run(['agent', 'codex', '--case', selected.id], env);
+  assert.equal(caseResult.code, 0, caseResult.output);
+  assert.match(JSON.parse(readFileSync(f.capture, 'utf8')).task.instructions, /读取所选案例/);
 });
 
 test('skill directory is accepted, and invalid skills fail before launching an agent', { skip: process.platform === 'win32', timeout: 15000 }, async () => {

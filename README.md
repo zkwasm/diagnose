@@ -20,7 +20,7 @@ In v0.8+, press Enter to review tasks and results, choose `a` to approve tasks a
 
 ### Manual agent mode (recommended for a first session)
 
-Install once from this GitHub repository. The native Skill uses Diagnose 0.8.1 and starts the local runtime on demand through Node.js and npm.
+Install once from this GitHub repository. The native Skill uses Diagnose 0.8.2 and starts the local runtime on demand through Node.js and npm.
 
 | Agent | Install | Use |
 | --- | --- | --- |

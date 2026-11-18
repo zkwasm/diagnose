@@ -6,7 +6,7 @@ import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import { PairingStore } from './pairing.js';
-import { skillPrompt } from './skill.js';
+import { caseInstructions, promptLanguage, skillPrompt } from './skill.js';
 import { resolveSkill } from './skill-library.js';
 import { Cases } from './cases.js';
 import { agentCommand } from './agent-command.js';
@@ -25,9 +25,8 @@ export async function launchAgent(argv: string[]): Promise<number> {
   if (selectedCase?.host && values.device && selectedCase.host !== values.device) throw new Error('Selected case belongs to a different paired computer');
   if (selectedCase?.skill && values.skill && selectedCase.skill !== values.skill) throw new Error('Case skill revision differs from selected skill');
   const skillInput = values.skill ?? selectedCase?.skill;
-  let skill = skillInput ? await resolveSkill(skillInput) : undefined;
-  if (selectedCase && !skill) skill = { sourceFile: '', baseDirectory: process.cwd(), sha256: '', instructions: 'Use diagnose_case show to read the selected case. Confirm the external target identity, inspect interfaces conservatively, diagnose the stated goal, apply only authorized repairs, and record evidence-backed verification. Propose a reusable skill draft if useful.' };
-  if (skill && agent === 'gemini' && extra.some(arg => ['-p', '--prompt', '-i', '--prompt-interactive'].includes(arg) || arg.startsWith('--prompt=') || arg.startsWith('--prompt-interactive='))) throw new Error('--skill supplies the initial task; do not also pass a Gemini prompt option');
+  const skill = skillInput ? await resolveSkill(skillInput) : undefined;
+  if ((skill || selectedCase) && agent === 'gemini' && extra.some(arg => ['-p', '--prompt', '-i', '--prompt-interactive'].includes(arg) || arg.startsWith('--prompt=') || arg.startsWith('--prompt-interactive='))) throw new Error('--skill supplies the initial task; do not also pass a Gemini prompt option');
   if (values.relay) {
     const url = new URL(values.relay);
     if (!['https:', 'wss:'].includes(url.protocol) && !(['http:', 'ws:'].includes(url.protocol) && ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname))) throw new Error('Relay requires HTTPS/WSS, except loopback tests');
@@ -38,12 +37,14 @@ export async function launchAgent(argv: string[]): Promise<number> {
   const env = { ...process.env }; let directory: string | undefined;
   try {
     let prompt: string | undefined, taskDirectory: string | undefined;
-    if (skill) {
+    if (skill || selectedCase) {
+      const language = await promptLanguage();
       directory = await mkdtemp(join(tmpdir(), 'diagnose-agent-'));
       taskDirectory = join(directory, 'task'); await mkdir(taskDirectory, { mode: 0o700 });
       const snapshot = join(taskDirectory, 'task.json');
-      await writeFile(snapshot, JSON.stringify(skill), { mode: 0o600 });
-      prompt = skillPrompt(snapshot) + (values.device ? '\nDiagnose MCP is already configured for the saved device ' + JSON.stringify(values.device) + '. Use its tools directly; do not ask for a pairing code. If unavailable, ask the user to start or resume their probe.' : '');
+      const task = skill ?? { sourceFile: '', baseDirectory: process.cwd(), sha256: '', instructions: caseInstructions[language] };
+      await writeFile(snapshot, JSON.stringify(task), { mode: 0o600 });
+      prompt = skillPrompt(snapshot, language, values.device);
       console.error('Starting the selected skill. Its instructions and referenced data may be sent to your chosen AI provider. Remote pairing and existing permissions still apply.');
     }
     let args: string[];

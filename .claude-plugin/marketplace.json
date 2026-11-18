@@ -1,0 +1,13 @@
+{
+  "name": "diagnose",
+  "description": "The official Diagnose remote troubleshooting plugin.",
+  "owner": {
+    "name": "Diagnose"
+  },
+  "plugins": [
+    {
+      "name": "diagnose",
+      "source": "./"
+    }
+  ]
+}

@@ -65,9 +65,11 @@ Then run this on the on-site computer:
 npx @masstensor/diagnose@latest start
 ```
 
-If npm asks to install the package, type `y`. Keep this terminal open. Send the nine-letter invitation, such as `abc-def-ghi`, privately to your diagnostician.
+If npm asks to install the package, type `y`. In v0.8+, choose the [approval mode](#2-start-on-the-users-computer) before sharing the invitation. Press Enter for review, `a` for automatic tasks and results, or `e` to also preapprove the connection. Keep this terminal open and share the nine-letter invitation privately.
 
 ### 3. On the diagnostician's computer
+
+For an existing Claude Code, Codex CLI, or Gemini CLI session, install the [native Diagnose skill from GitHub](#use-diagnose-as-a-native-agent-skill) once, then invoke it with the invitation. For a script or an agent session that should start with Diagnose already configured, use the npm launcher:
 
 ```sh
 npx @masstensor/diagnose@latest agent codex
@@ -80,7 +82,7 @@ In the agent conversation, provide the code, device model, connection method, an
 
 ### 4. Approve, diagnose, and finish
 
-The person receiving help checks the diagnostician's label and connection fingerprint, then chooses `y` to review tasks and result transfers. Choosing `a` instead grants automatic execution **and transmission** under the displayed terms. Commands run with that user's OS permissions; results can reach the diagnostician and their AI provider.
+Unless the on-site user chose **Approve everything**, they check the diagnostician's label and connection fingerprint and approve the connection. If they selected auto approval at startup, `y` confirms it for this session and `r` connects with per-task review. Otherwise, `y` uses per-task review and `a` grants auto approval. Auto approval covers both execution **and result transmission**. Commands run with that user's OS permissions, and results can reach the diagnostician and their AI provider.
 
 The diagnostician directs the agent to investigate the device, repair within permission, and verify a device result: for example, new sensor readings or a successful communication check. The user can type `permissions ask` to revoke automatic approval or `exit` to stop access. Afterward, `diagnose history` lists local task records and `diagnose show TASK_ID` shows what was requested, collected, and sent.
 
@@ -209,7 +211,17 @@ npm install -g @masstensor/diagnose@latest
 diagnose start
 ```
 
-With v0.7+, the terminal shows a **nine-letter invitation**, such as `abc-def-ghi`, and the audit log path. Keep it open. Share the code privately by message or read it aloud. It lasts **30 minutes** and is consumed by successful pairing. Case, spaces and hyphens do not matter when entering it. The user must still approve locally. Treat the code as a secret; do not post it publicly or put it in shell arguments. After expiry or five attempted handshakes, the running probe generates a new code.
+With v0.8+, a probe starting a new pairing asks which approval mode to use before displaying its invitation.
+
+| Startup choice | What it allows |
+| --- | --- |
+| Enter | Confirm the connection and review each task and result transfer. |
+| `a` · Auto tasks only | Confirm the connection once. Tasks and result transfers then proceed automatically. |
+| `e` · Approve everything | Let the holder of this one-time invitation connect automatically, run tasks, and receive results for the temporary session. |
+
+Share an **Approve everything** invitation only with the intended diagnostician. Type `permissions ask` to cancel that choice before pairing or revoke auto approval after pairing. The next invitation does not inherit it. Requests to remember a diagnostician still require confirmation.
+
+With v0.7+, the terminal shows a **nine-letter invitation**, such as `abc-def-ghi`, and the audit log path. Keep it open. Share the code privately by message or read it aloud. It lasts **30 minutes** and is consumed by successful pairing. Case, spaces and hyphens do not matter when entering it. Treat the code as a secret; do not post it publicly or put it in shell arguments. After expiry or five attempted handshakes, the running probe generates a new code.
 
 The probe will show the connecting party's self-reported label and the session fingerprint. Check these with the intended diagnostician before accepting. A code proves possession of the secret, not a person's identity.
 
@@ -612,7 +624,7 @@ For download resume, keep the partial file and sidecar together. Upload resume u
 | Limit | Default / maximum |
 | --- | --- |
 | New short invitation | 30 minutes; one-time; up to five attempted handshakes |
-| Temporary session idle / total | 10 minutes / 60 minutes by default |
+| Temporary session idle / total | Six hours idle / no fixed total by default in v0.8+ |
 | Remembered pairing | Until revoked locally; requires the foreground probe |
 | Remembered automatic grant | 1 hour, or until locally revoked if explicitly chosen |
 | Finite command or script | 60 seconds by default; 300 seconds maximum |
@@ -621,7 +633,7 @@ For download resume, keep the partial file and sidecar together. Upload resume u
 | Active live resource handles | 128 |
 | Live process | 1 hour by default; `timeoutMs:0` removes its timer |
 | Retained output per live process | 64 MiB by default; 1 GiB maximum; reaching the cap terminates the process |
-| Relay session | At most 7 days, also subject to cipher frame limits |
+| Relay session | The updated relay renews an active room without a fixed total. Older relays may cap a room at seven days. |
 
 ```sh
 diagnose start --session-minutes 240 --idle-minutes 30
@@ -629,7 +641,64 @@ diagnose start --session-minutes 240 --idle-minutes 30
 
 Session and idle options apply to temporary connections. Remembered connections disable these endpoint timers, while automatic approval has its own saved expiry. Set a temporary session or idle timeout to `0` to disable that endpoint timer; relay and cipher limits still apply. Both endpoints should use a compatible current version. POSIX processes that deliberately detach from their process group cannot always be terminated by group cancellation.
 
+## Use Diagnose as a native agent skill
+
+Install the skill once through your agent's GitHub installation flow. All three agents use the same `skills/connect/` directory in the repository. The helper runs Diagnose 0.8.0 locally on demand with `npx` and needs Node.js 20.10 or later. There is no separate global Diagnose CLI installation for this workflow.
+
+### Claude Code
+
+In Claude Code 2.1.275 or later, enter:
+
+```text
+/plugin install diagnose --marketplace zkwasm/diagnose
+```
+
+Choose the installation scope. Open a new session, or use `/reload-plugins` in the current one. Invoke `/diagnose:connect` with the private invitation and, if known, the device and symptom. [Claude Code plugin documentation](https://code.claude.com/docs/en/discover-plugins#add-a-marketplace-and-install-in-one-command)
+
+### Codex CLI
+
+In your terminal, run:
+
+```sh
+codex plugin marketplace add zkwasm/diagnose
+codex plugin add diagnose@diagnose
+```
+
+Alternatively, add the marketplace and install Diagnose from `/plugins`. Open a new session and invoke `$diagnose:connect` with your private invitation. [Codex CLI plugin documentation](https://learn.chatgpt.com/docs/cli/reference#codex-plugin)
+
+### Gemini CLI
+
+In your terminal, run:
+
+```sh
+gemini skills install https://github.com/zkwasm/diagnose.git --path skills/connect
+```
+
+Approve the installation prompt. In a new session, ask Gemini to use the `connect` skill and provide the invitation. Use `/skills reload` if a Gemini session is already open. [Gemini CLI Skills documentation](https://geminicli.com/docs/cli/skills/#managing-skills)
+
+### Run a diagnostic session
+
+The on-site user starts the normal probe and shares its one-time invitation. The skill uses it to request pairing through the relay. The on-site user confirms the connection if their startup choice requires it. The agent starts with a relevant read-only check, such as listing visible serial ports. It keeps the connection for follow-up checks, authorized changes, and verification. Normal local execution and transfer permissions still apply.
+
+The first result informs the next step. For example, the agent may compare device logs with two related settings, correct one setting, and rerun the original check. If the symptom persists, it uses that result to choose the next test. The skill keeps the connection open after progress reports and verification so you can ask follow-up questions. Ask the agent to close the session when you are done. The on-site user can also stop access.
+
+A temporary session normally expires after six hours without diagnostic activity. Task requests, result polling, and live resource interactions renew the timer. Automatic heartbeats keep the network connection alive without renewing the diagnostic idle timer. A probe configured with an explicit total limit can expire the session earlier. A network or process loss can still interrupt a live connection. If interruptions are expected, a remembered pairing can reconnect without a fresh code. A direct stdio MCP session ends when its client stops the MCP process. The native skill keeps its MCP process running across separate shell calls and conversation turns.
+
+This path uses temporary pairing and finite diagnostic operations. It supports system inspection, bounded file operations, finite commands, and serial diagnostics. The full agent launcher remains available for remembered connections, live terminals, and case management.
+
+For prerelease testing, build the source checkout, install from its local marketplace or skill directory, and set `DIAGNOSE_SKILL_CLI` in the agent's environment to the absolute path of `dist/cli.js`. The GitHub install commands require the repository manifests to be published. The helper's default runtime requires the pinned npm version to be published.
+
 ## 8. Manual operation and other MCP clients
+
+For scripts and CI, install the npm client and start it directly. The native Skill is optional for these workflows.
+
+```sh
+npm install -g @masstensor/diagnose
+diagnose agent claude --device workshop-laptop --skill ./devices/owon.md
+# Or use diagnose mcp --device workshop-laptop as the MCP server subprocess.
+```
+
+Use `agent codex` or `agent gemini` for the other launchers. You can also run the npm launcher directly with `npx @masstensor/diagnose@latest agent claude`. The `--skill` launcher flag takes your device procedure. It does not require the native Diagnose Skill to be installed.
 
 ```sh
 diagnose connect

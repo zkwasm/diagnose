@@ -47,6 +47,8 @@ export class Operator {
   }
   async wait(id: string, timeoutMs = 1000): Promise<Outcome | { id: string; pending: true }> {
     const job = this.jobs.get(id); if (!job) throw new Error('Unknown or expired task result; completed results are bounded to 128 tasks / 32 MiB. Do not replay modifications; inspect remote state or local history.');
+    // Polling a real task is diagnostic activity even though the result is cached locally.
+    void this.peer.send({ type: 'ping', activity: true }).catch(() => {});
     let timer: NodeJS.Timeout | undefined;
     try { return await Promise.race([job.promise, new Promise<{ id: string; pending: true }>(resolve => { timer = setTimeout(() => resolve({ id, pending: true }), timeoutMs); })]); }
     finally { clearTimeout(timer); }

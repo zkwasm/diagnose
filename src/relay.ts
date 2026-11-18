@@ -4,14 +4,20 @@ import { WebSocket, WebSocketServer } from 'ws';
 import { MAX_FRAME } from './schema.js';
 import { INVITATION_MS } from './crypto.js';
 import { VaultServer } from './vault-server.js';
+import { DEFAULT_IDLE_MS, LEGACY_RELAY_MAX_MS } from './session-limits.js';
 
 export type RelayOptions = { host?: string; port?: number; invitationMs?: number; sessionMs?: number; maxRooms?: number; downloadPath?: string; vaultPath?: string; observeCiphertext?: (bytes: Buffer) => void };
-type Room = { short: boolean; host: WebSocket; peer?: WebSocket; locked: boolean; attempts: number; expires: number; frames: number; window: number };
+type Room = { short: boolean; host: WebSocket; peer?: WebSocket; locked: boolean; attempts: number; expires: number; renewMs?: number; frames: number; window: number };
 const control = (ws: WebSocket, type: string, extra = {}): void => { if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type, ...extra })); };
 
 export function createRelay(options: RelayOptions = {}) {
   const vault = options.vaultPath ? new VaultServer(options.vaultPath) : undefined;
   const rooms = new Map<string, Room>();
+  const expireRoom = (id: string, room: Room): void => {
+    rooms.delete(id);
+    room.host.close(1000, 'Session expired');
+    room.peer?.close(1000, 'Session expired');
+  };
   const clients = new Map<WebSocket, { role?: 'host' | 'join'; room?: string; ip: string; alive: boolean }>();
   const connectionsByIp = new Map<string, number>();
   const connectionRates = new Map<string, { since: number; count: number }>();
@@ -69,7 +75,8 @@ export function createRelay(options: RelayOptions = {}) {
           clearTimeout(registration); return;
         }
         const room = rooms.get(state.room!);
-        if (!room || room.expires < Date.now()) throw new Error();
+        if (!room) throw new Error();
+        if (room.expires <= Date.now()) { expireRoom(state.room!, room); return; }
         if (binary) {
           if (Date.now() - room.window > 1000) { room.window = Date.now(); room.frames = 0; }
           if (++room.frames > 250 || bytes.length > MAX_FRAME) throw new Error();
@@ -77,12 +84,21 @@ export function createRelay(options: RelayOptions = {}) {
           if (!target || target.readyState !== WebSocket.OPEN || target.bufferedAmount > 1024 * 1024) throw new Error();
           let buffered = 0; for (const client of clients.keys()) buffered += client.bufferedAmount;
           if (buffered > 64 * 1024 * 1024) throw new Error();
+          // The relay can see ciphertext traffic, not diagnostic activity. The
+          // probe enforces the real idle timeout without counting heartbeats.
+          if (room.renewMs) room.expires = Date.now() + room.renewMs;
           options.observeCiphertext?.(bytes);
           target.send(bytes, { binary: true }); return;
         }
         if (bytes.length > 128 || state.role !== 'host') throw new Error();
         const msg = JSON.parse(bytes.toString());
-        if (msg.type === 'lock' && !room.locked) { const requested = msg.ttlMs; if (requested !== undefined && (!Number.isInteger(requested) || requested < 60000 || requested > 7 * 86400000)) throw new Error(); room.locked = true; room.expires = Date.now() + (requested ?? options.sessionMs ?? 3600000); }
+        if (msg.type === 'lock' && !room.locked) {
+          const requested = msg.ttlMs;
+          if (requested !== undefined && (!Number.isInteger(requested) || requested < 60000 || requested > LEGACY_RELAY_MAX_MS)) throw new Error();
+          room.locked = true;
+          if (msg.sliding === true) room.renewMs = options.sessionMs ?? DEFAULT_IDLE_MS;
+          room.expires = Date.now() + (room.renewMs ?? requested ?? options.sessionMs ?? DEFAULT_IDLE_MS);
+        }
         else if (msg.type === 'reject' && !room.locked) { const peer = room.peer; room.peer = undefined; peer?.close(1008, 'Pairing rejected'); }
         else throw new Error();
       } catch { ws.close(1008, 'Protocol rejected'); }
@@ -97,7 +113,7 @@ export function createRelay(options: RelayOptions = {}) {
     });
   });
   const sweep = setInterval(() => {
-    for (const [id, room] of rooms) if (room.expires < Date.now()) { rooms.delete(id); room.host.close(1000, 'Session expired'); room.peer?.close(1000, 'Session expired'); }
+    for (const [id, room] of rooms) if (room.expires <= Date.now()) expireRoom(id, room);
     for (const [ws, state] of clients) { if (!state.alive) ws.terminate(); else { state.alive = false; ws.ping(); } }
   }, 10000);
   sweep.unref();

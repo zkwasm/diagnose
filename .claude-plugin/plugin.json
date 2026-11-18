@@ -1,0 +1,8 @@
+{
+  "name": "diagnose",
+  "description": "Troubleshoot remote devices through a user-authorized Diagnose session.",
+  "version": "0.8.0",
+  "author": { "name": "Diagnose" },
+  "repository": "https://github.com/zkwasm/diagnose",
+  "license": "MIT"
+}

@@ -5,6 +5,7 @@ import { Audit, digest, redact, safeText } from './util.js';
 import { SessionResources, resourceOperation } from './resources.js';
 import { randomUUID } from 'node:crypto';
 import { dirname, join, basename } from 'node:path';
+import { DEFAULT_IDLE_MS } from './session-limits.js';
 
 export type PermissionMode = 'ask' | 'auto';
 function aborted<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
@@ -46,15 +47,21 @@ export class ProbeEngine {
   constructor(private peer: Peer, private approve: ApprovalHandler, readonly audit: Audit, private notice: (message: string) => void = () => {}, options: { resources?: SessionResources; idleMs?: number; lifetimeMs?: number } = {}) {
     this.resources = options.resources ?? new SessionResources(join(dirname(audit.path), basename(audit.path) + '.resources'), audit);
     this.resources.setAudit(audit);
+    const idleMs = options.idleMs ?? DEFAULT_IDLE_MS;
+    const refreshIdle = () => {
+      if (!idleMs || this.ended) return;
+      clearTimeout(this.idle);
+      this.idle = setTimeout(() => peer.close('Idle timeout'), idleMs);
+    };
     // Waiting for an invitation/approval is not diagnostic session time.
-    // Otherwise the default ten-minute idle timer would cut a 30-minute code short.
     void peer.active.then(() => {
       if (this.ended) return;
-      if (options.idleMs !== 0) this.idle = setTimeout(() => peer.close('Idle timeout'), options.idleMs ?? 600000);
-      if (options.lifetimeMs !== 0) this.lifetime = setTimeout(() => peer.close('Session lifetime exceeded'), options.lifetimeMs ?? 3600000);
+      refreshIdle();
+      if (options.lifetimeMs) this.lifetime = setTimeout(() => peer.close('Session lifetime exceeded'), options.lifetimeMs);
     }).catch(() => {});
+    peer.on('activity', refreshIdle);
     peer.on('message', (message: WireMessage) => {
-      this.idle?.refresh();
+      refreshIdle();
       if (message.type === 'resource.request') { void this.resources.control(this.owner, message.request).then(value => this.peer.send({ type: 'resource.result', requestId: message.requestId, value }), error => this.peer.send({ type: 'resource.result', requestId: message.requestId, error: redact((error as Error).message).slice(0, 2000) })).catch(() => {}); return; }
       if (message.type === 'task.cancel') { try { audit.record('task.cancel-requested', { id: message.id, source: 'operator' }); this.jobs.get(message.id)?.abort(); void this.resources.control(this.owner, { id: message.id, action: 'close', cursor: 0, limit: 65536, eof: false }).catch(() => {}); } catch { peer.close('Audit unavailable'); } return; }
       if (message.type !== 'task.request') { peer.close('Unexpected operator message'); return; }
@@ -74,7 +81,7 @@ export class ProbeEngine {
       const controller = new AbortController(); this.jobs.set(task.id, controller);
       void this.run(task, controller);
     });
-    peer.on('closed', () => { this.ended = true; clearTimeout(this.idle); clearTimeout(this.lifetime); for (const controller of this.jobs.values()) controller.abort(); void this.resources.disconnect(this.owner).catch(() => {}); try { audit.record('session.closed', {}); } catch { /* Session is already closed. */ } });
+    peer.on('closed', (reason?: string) => { this.ended = true; clearTimeout(this.idle); clearTimeout(this.lifetime); for (const controller of this.jobs.values()) controller.abort(); void this.resources.disconnect(this.owner).catch(() => {}); try { audit.record('session.closed', { reason: reason && redact(reason) }); } catch { /* Session is already closed. */ } });
   }
   private async reply(id: string, result: Result): Promise<void> { await this.peer.send({ type: 'task.result', id, result }).catch(() => {}); }
   private async finish(id: string, result: Result): Promise<void> { this.jobs.delete(id); await this.reply(id, result); }

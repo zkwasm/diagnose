@@ -4,6 +4,7 @@ import { Handshake, parseCode, parseInvitation, INVITATION_MS, type SecureCipher
 import { CHUNK_SIZE, MAX_FRAME, parseMessage, type WireMessage } from './schema.js';
 import { safeText } from './util.js';
 import { InvitationHost, InvitationJoin } from './short-pairing.js';
+import { LEGACY_RELAY_MAX_MS } from './session-limits.js';
 
 export type PeerOptions = { role: 'host' | 'join'; code: string; relay: string; label?: string; remember?: boolean; provision?: () => string | undefined; accept?: (peer: { label: string; fingerprint: string; signal: AbortSignal; remember: boolean }) => Promise<boolean>; approvalTimeoutMs?: number; sessionMs?: number; invitationMs?: number };
 function deferred<T>() { let resolve!: (value: T) => void; let reject!: (error: Error) => void; const promise = new Promise<T>((a, b) => { resolve = a; reject = b; }); promise.catch(() => {}); return { promise, resolve, reject }; }
@@ -58,7 +59,11 @@ export class Peer extends EventEmitter {
     if (short && options.role === 'host') this.invitationTimer = setTimeout(() => this.close('Invitation expired; generate a new code'), Math.min(options.invitationMs ?? INVITATION_MS, INVITATION_MS));
     this.ws.on('open', () => this.ws.send(JSON.stringify({ version: short ? 2 : 1, role: options.role, room })));
     this.ws.on('error', () => this.close('Relay connection failed'));
-    this.ws.on('close', (_code, reason) => this.close(reason.toString() === 'Invitation locator occupied' ? 'Invitation locator occupied; generating a new code' : 'Relay disconnected'));
+    this.ws.on('close', (_code, reason) => {
+      const message = reason.toString();
+      this.close(message === 'Invitation locator occupied' ? 'Invitation locator occupied; generating a new code'
+        : message === 'Session expired' ? 'Relay session expired' : 'Relay disconnected');
+    });
     this.ws.on('message', (bytes, binary) => {
       try {
         if (binary) this.receive(Buffer.from(bytes as Buffer));
@@ -124,7 +129,9 @@ export class Peer extends EventEmitter {
           clearTimeout(timer);
           if (this.destroyed || generation !== this.generation) return;
           if (!allowed || this.approval?.signal.aborted) { await this.send({ type: 'session.closed', reason: 'User declined pairing' }); this.close('User declined pairing'); return; }
-          this.ws.send(JSON.stringify({ type: 'lock', ...(this.options.sessionMs === undefined ? {} : { ttlMs: this.options.sessionMs || 7 * 86400000 }) }));
+          this.ws.send(JSON.stringify(this.options.sessionMs
+            ? { type: 'lock', ttlMs: this.options.sessionMs }
+            : { type: 'lock', sliding: true, ttlMs: LEGACY_RELAY_MAX_MS }));
           this.approved = true;
           await this.send({ type: 'session.accepted', label: safeText(this.options.label ?? 'User probe'), fingerprint: this.fingerprint, ...(hello.remember === true && this.options.provision?.() ? { credential: this.options.provision!() } : {}) });
           this.activate();
@@ -148,7 +155,10 @@ export class Peer extends EventEmitter {
       clearTimeout(this.handshakeTimer); this.approved = true; this.activate(); return;
     }
     if (!this.approved) throw new Error('Not authorized');
-    if (message.type === 'ping') { void this.send({ type: 'pong' }).catch(() => this.close('Heartbeat failed')); return; }
+    if (message.type === 'ping') {
+      if (message.activity && this.options.role === 'host') this.emit('activity');
+      void this.send({ type: 'pong' }).catch(() => this.close('Heartbeat failed')); return;
+    }
     if (message.type === 'pong') return;
     this.emit('message', message);
   }
@@ -174,6 +184,7 @@ export class Peer extends EventEmitter {
         // Bound sustained traffic below the relay's shared per-room frame budget.
         await new Promise(resolve => setTimeout(resolve, 10));
       }
+      if (message.type.startsWith('task.') || message.type.startsWith('resource.')) this.emit('activity');
     }).finally(() => { this.queuedBytes -= payload.length; });
     this.queue = operation.catch(() => this.close('Encrypted transport failed'));
     return operation;

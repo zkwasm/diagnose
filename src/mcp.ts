@@ -13,7 +13,7 @@ import { safeText } from './util.js';
 import { registerKnowledge } from './knowledge-mcp.js';
 
 export async function serveMcp(relay: string, device?: string, caseId?: string): Promise<void> {
-  const server = new McpServer({ name: 'diagnose', version: '0.7.0' });
+  const server = new McpServer({ name: 'diagnose', version: '0.8.0' });
   let operator: Operator | undefined;
   let remembered = device ? new RememberedConnection(new PairingStore().get(device, 'operator')) : undefined;
   const transfers = new Map<string, { progress: TransferProgress; controller: AbortController }>(), forwards = new Map<string, Forward>();
@@ -53,7 +53,15 @@ export async function serveMcp(relay: string, device?: string, caseId?: string):
     if (action === 'open') { if (forwards.has(resourceId)) throw new Error('Forward already open'); forwards.set(resourceId, await forward(await connected(), resourceId, localPort)); }
     const value = forwards.get(resourceId); if (!value) throw new Error('Unknown local forward'); if (action === 'close') { await value.close(); forwards.delete(resourceId); return answer({ closed: true }); } return answer({ id: value.id, direction: value.direction, host: value.host, port: value.port });
   });
-  server.registerTool('diagnose_disconnect', { description: 'End this diagnostic connection. Remembered pairing remains until revoked on the user computer.', inputSchema: {} }, async () => { remembered?.close(); remembered = undefined; operator?.peer.close(); operator = undefined; return answer({ disconnected: true }); });
+  server.registerTool('diagnose_disconnect', { description: 'Explicitly end this diagnostic connection. Remembered pairing remains until revoked on the user computer.', inputSchema: {} }, async () => {
+    remembered?.close(); remembered = undefined;
+    const peer = operator?.peer; operator = undefined;
+    if (peer) {
+      await peer.send({ type: 'session.closed', reason: 'Diagnostician ended session' }).catch(() => {});
+      peer.close();
+    }
+    return answer({ disconnected: true });
+  });
   let stopped = false;
   const stop = () => { if (stopped) return; stopped = true; for (const transfer of transfers.values()) transfer.controller.abort(); for (const value of forwards.values()) void value.close(); remembered?.close(); operator?.peer.close(); knowledge.close(); void server.close(); };
   process.once('exit', () => knowledge.close());

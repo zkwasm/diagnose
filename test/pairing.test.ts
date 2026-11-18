@@ -50,7 +50,12 @@ test('actual host survives probe and relay restarts, pauses access, and revokes 
   let output = '', pairPrompts = 0;
   const start = () => {
     const child = spawn('/bin/sh', ['-c', 'cat | /usr/bin/script -q /dev/null "$@"', 'remember-test', process.execPath, resolve('dist/cli.js'), 'start', url], { detached: true, env: { ...process.env, HOME: root }, stdio: ['pipe', 'pipe', 'pipe'] });
-    child.stderr.resume(); child.stdout.on('data', bytes => { output += bytes.toString(); if (output.includes('Remember and allow this diagnostician?') && !pairPrompts) { pairPrompts++; child.stdin.write('a\n'); } }); return child;
+    let startup = false;
+    child.stderr.resume(); child.stdout.on('data', bytes => {
+      output += bytes.toString();
+      if (!startup && output.includes('Task approval for the next session?')) { startup = true; child.stdin.write('e\n'); }
+      if (output.includes('Remember and allow this diagnostician?') && !pairPrompts) { pairPrompts++; child.stdin.write('a\n'); }
+    }); return child;
   };
   let child = start(), peer: Peer | undefined;
   const until = async (predicate: () => boolean) => { for (let i = 0; i < 300 && !predicate(); i++) await new Promise(resolve => setTimeout(resolve, 20)); assert.ok(predicate(), output); };

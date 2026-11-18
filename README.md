@@ -16,9 +16,21 @@ On the computer being diagnosed:
 npx @masstensor/diagnose@latest start
 ```
 
-Keep the terminal open and privately share its nine-letter invitation, such as `abc-def-ghi`, with the diagnostician.
+In v0.8+, press Enter to review tasks and results, choose `a` to approve tasks and results automatically after confirming the connection, or choose `e` to preapprove all three for this one-time invitation. Keep the terminal open and privately share its nine-letter invitation, such as `abc-def-ghi`, with the diagnostician.
 
-On the diagnostician's computer, start an already installed and authenticated agent:
+### Use Diagnose in your existing agent
+
+Install once from this GitHub repository. The native Skill uses Diagnose 0.8.0 and starts the local runtime on demand through Node.js and npm.
+
+| Agent | Install | Use |
+| --- | --- | --- |
+| Claude Code | `/plugin install diagnose --marketplace zkwasm/diagnose` | `/diagnose:connect` |
+| Codex CLI | `codex plugin marketplace add zkwasm/diagnose`, then `codex plugin add diagnose@diagnose` | `$diagnose:connect` in a new session. |
+| Gemini CLI | `gemini skills install https://github.com/zkwasm/diagnose.git --path skills/connect` | Ask Gemini to use the `connect` skill. |
+
+### Start from the command line or automate a diagnosis
+
+On the diagnostician's computer, use the npm launcher when a script or job needs to start and configure an agent:
 
 ```sh
 npx @masstensor/diagnose@latest agent codex
@@ -29,7 +41,7 @@ The agent launcher requires **0.3.1+**. It loads Diagnose MCP for this launch wi
 
 > Use Diagnose to connect to this pairing code: abc-def-ghi . Help resolve the user's application startup failure. First investigate without changing anything. Explain the cause, proposed fix, and risks. Apply only authorized changes, then check whether the application starts successfully and report anything still unresolved.
 
-The user must approve the connection locally. They choose per-task approval or automatic execution **and transmission** for this temporary session. Possessing a pairing code does not establish the diagnostician's real identity.
+The user grants permission locally, either when the connection arrives or in advance with **Approve everything**. Automatic task approval includes both execution and result transmission. Possessing a pairing code does not establish the diagnostician's real identity.
 
 For repeated use:
 
@@ -41,6 +53,8 @@ diagnose agent codex
 ```
 
 Short invitations require **0.7.0+ on both endpoints** and the updated relay. They last 30 minutes, tolerate case/spaces/hyphens, and still require local approval. Existing remembered pairings remain valid. See the [protocol design](PAIRING_PROTOCOL.md).
+
+For a custom automation client, run `diagnose mcp` as a stdio subprocess. See the [native setup](USER_GUIDE.md#use-diagnose-as-a-native-agent-skill) and [automation setup](USER_GUIDE.md#8-manual-operation-and-other-mcp-clients) for the two entry points.
 
 ## Pair once, return later
 

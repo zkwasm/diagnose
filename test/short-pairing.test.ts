@@ -98,3 +98,45 @@ test('session idle and lifetime clocks start after pairing, not while the code i
   try { await joiner.open(); assert.equal(await host.ended, 'Idle timeout'); }
   finally { joiner.close(); host.close(); await relay.close(); await rm(root, { recursive: true, force: true }); }
 });
+
+test('relay renews the locked room on encrypted traffic past six hours and expires a silent room', { timeout: 10000 }, async t => {
+  let now = Date.now();
+  t.mock.method(Date, 'now', () => now);
+  const relay = createRelay({ port: 0 }), url = 'ws://127.0.0.1:' + await relay.listen(), code = createInvitation();
+  const host = new Peer({ role: 'host', code, relay: url, accept: async () => true });
+  let joiner: Peer | undefined;
+  try {
+    await host.open();
+    joiner = new Peer({ role: 'join', code, relay: url });
+    await joiner.open();
+    await host.active;
+    for (let round = 0; round < 3; round++) {
+      now += 5 * 60 * 60_000;
+      const received = once(host, 'message');
+      await joiner.send({ type: 'task.cancel', id: '26155a8b-c35a-436e-948a-9797732e6259' });
+      assert.equal((await received)[0].type, 'task.cancel');
+    }
+    now += 6 * 60 * 60_000;
+    await joiner.send({ type: 'ping' });
+    assert.equal(await host.ended, 'Relay session expired');
+    assert.equal(await joiner.ended, 'Relay session expired');
+  } finally { joiner?.close(); host.close(); await relay.close(); }
+});
+
+test('normal heartbeat is not diagnostic activity but an explicit result poll is', { timeout: 5000 }, async () => {
+  const relay = createRelay({ port: 0 }), url = 'ws://127.0.0.1:' + await relay.listen(), code = createInvitation();
+  const host = new Peer({ role: 'host', code, relay: url, accept: async () => true });
+  await host.open();
+  const joiner = new Peer({ role: 'join', code, relay: url });
+  let activity = 0;
+  host.on('activity', () => { activity++; });
+  try {
+    await joiner.open();
+    await joiner.send({ type: 'ping' });
+    assert.equal(activity, 0);
+    const touched = once(host, 'activity');
+    await joiner.send({ type: 'ping', activity: true });
+    await touched;
+    assert.equal(activity, 1);
+  } finally { joiner.close(); host.close(); await relay.close(); }
+});

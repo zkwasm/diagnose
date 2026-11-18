@@ -50,7 +50,8 @@ export type WireMessage =
   | { type: 'resource.result'; requestId: string; value?: unknown; error?: string }
   | { type: 'resource.request'; requestId: string; request: ResourceRequest }
   | { type: 'resource.result'; requestId: string; value?: unknown; error?: string }
-  | { type: 'ping' | 'pong' };
+  | { type: 'ping'; activity?: true }
+  | { type: 'pong' };
 
 export function parseMessage(value: unknown): WireMessage {
   const basic = z.object({ type: z.string() }).passthrough().parse(value);
@@ -59,7 +60,8 @@ export function parseMessage(value: unknown): WireMessage {
     case 'task.cancel': return { type: basic.type, id: z.string().uuid().parse(basic.id) };
     case 'resource.request': return { type: basic.type, requestId: z.string().uuid().parse(basic.requestId), request: resourceRequestSchema.parse(basic.request) };
     case 'resource.result': return z.object({ type: z.literal('resource.result'), requestId: z.string().uuid(), value: z.unknown().optional(), error: z.string().max(2000).optional() }).strict().parse(value);
-    case 'ping': case 'pong': return { type: basic.type };
+    case 'ping': return basic.activity === true ? { type: 'ping', activity: true } : { type: 'ping' };
+    case 'pong': return { type: 'pong' };
     case 'session.accepted': return z.object({ type: z.literal('session.accepted'), label: z.string().max(120), fingerprint: z.string().max(100), credential: z.string().regex(/^D1\.[A-Za-z0-9_-]{16}\.[A-Za-z0-9_-]{43}$/).optional() }).strict().parse(value);
     case 'session.closed': return z.object({ type: z.literal('session.closed'), reason: z.string().max(200) }).strict().parse(value);
     case 'task.started': return z.object({ type: z.literal('task.started'), id: z.string().uuid(), digest: z.string().regex(/^[a-f0-9]{64}$/) }).strict().parse(value);

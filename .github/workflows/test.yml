@@ -23,6 +23,6 @@ jobs:
       - if: runner.os == 'Windows'
         run: npm run build
       - if: runner.os == 'Windows'
-        run: node --experimental-strip-types --test test/review.test.ts test/vector.test.ts test/skill.test.ts test/skill-library.test.ts test/knowledge.test.ts test/knowledge-mcp.test.ts test/short-pairing.test.ts
+        run: node --experimental-strip-types --test test/review.test.ts test/vector.test.ts test/skill.test.ts test/skill-library.test.ts test/knowledge.test.ts test/knowledge-mcp.test.ts test/short-pairing.test.ts test/skill-session.test.ts test/install-skill.test.ts
       - if: runner.os == 'Linux'
         run: npm run build:site && npm run check:site

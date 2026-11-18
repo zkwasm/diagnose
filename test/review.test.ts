@@ -73,6 +73,22 @@ class FixturePeer extends EventEmitter {
   close(reason: string) { this.emit('closed', reason); }
   request(task: Task, sequence: number): Promise<WireMessage> { return new Promise(resolve => { this.response = value => { if (value.type === 'task.result') resolve(value); }; this.emit('message', { type: 'task.request', task, sequence }); }); }
 }
+test('probe resets its six-hour idle timeout on activity without a fixed total limit', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout', 'Date'] });
+  const peer = new FixturePeer(), reasons: string[] = [];
+  peer.on('closed', reason => reasons.push(reason));
+  new ProbeEngine(peer as unknown as Peer, async () => false, new Audit(join(directory(), 'audit.jsonl')));
+  await peer.active;
+  for (let round = 0; round < 3; round++) {
+    t.mock.timers.tick(5 * 60 * 60_000);
+    assert.deepEqual(reasons, []);
+    peer.emit('activity');
+  }
+  t.mock.timers.tick(6 * 60 * 60_000 - 1);
+  assert.deepEqual(reasons, []);
+  t.mock.timers.tick(1);
+  assert.deepEqual(reasons, ['Idle timeout']);
+});
 test('more than 1000 sequenced tasks work and replayed sequences are rejected', { timeout: 60000 }, async () => {
   const root = directory(), peer = new FixturePeer(); let approvals = 0;
   new ProbeEngine(peer as unknown as Peer, async () => { approvals++; return false; }, new Audit(join(root, 'audit.jsonl')), () => {}, { idleMs: 0, lifetimeMs: 0 });

@@ -22,6 +22,7 @@ import { History } from './history.js';
 import { cleanupLocal } from './maintenance.js';
 import { skillsCommand, skillsUsage } from './skill-library.js';
 import { knowledgeCommand, knowledgeUsage } from './knowledge-cli.js';
+import { DEFAULT_IDLE_MS } from './session-limits.js';
 
 async function attachTerminal(operator: Operator, id: string): Promise<void> {
   let done = false, cursor = 0; const wasRaw = stdin.isRaw;
@@ -34,21 +35,29 @@ async function attachTerminal(operator: Operator, id: string): Promise<void> {
 }
 
 async function main(): Promise<void> {
+  if (process.argv[2] === 'install-skill') {
+    await (await import('./install-skill.js')).installSkill(process.argv.slice(3));
+    return;
+  }
+  if (process.argv[2] === 'skill-session') {
+    await (await import('./skill-session.js')).skillSessionCommand(process.argv.slice(3));
+    return;
+  }
   if (['cases', 'drafts', 'vault'].includes(process.argv[2])) { await knowledgeCommand(process.argv[2], process.argv.slice(3)); return; }
   if (process.argv[2] === 'skills') { await skillsCommand(process.argv.slice(3)); return; }
   if (process.argv[2] === 'agent') { process.exitCode = await launchAgent(process.argv.slice(3)); return; }
-  const { positionals, values } = parseArgs({ args: process.argv.slice(2), allowPositionals: true, options: { 'session-minutes': { type: 'string', default: '60' }, 'idle-minutes': { type: 'string', default: '10' }, device: { type: 'string' }, case: { type: 'string' }, name: { type: 'string' }, days: { type: 'string', default: '7' }, cursor: { type: 'string', default: '0' } } });
+  const { positionals, values } = parseArgs({ args: process.argv.slice(2), allowPositionals: true, options: { 'session-minutes': { type: 'string', default: '0' }, 'idle-minutes': { type: 'string', default: String(DEFAULT_IDLE_MS / 60_000) }, device: { type: 'string' }, case: { type: 'string' }, name: { type: 'string' }, days: { type: 'string', default: '7' }, cursor: { type: 'string', default: '0' } } });
   const [command = 'help', relay = 'https://diagnose.fenginwind.com'] = positionals;
   if (command === 'history') { console.log(safeText(JSON.stringify(new History().list(), null, 2))); return; }
   if (command === 'show') { const cursor = Number(values.cursor); if (!Number.isSafeInteger(cursor) || cursor < 0) throw new Error('Cursor must be a nonnegative integer'); console.log(safeText(JSON.stringify(new History().show(positionals[1] ?? '', cursor), null, 2))); return; }
   if (command === 'cleanup') { console.log(JSON.stringify(cleanupLocal(Number(values.days)), null, 2)); return; }
   if (positionals.length > 2) throw new Error('Usage: diagnose start|connect|terminal|mcp [relay-url]');
   const sessionMinutes = Number(values['session-minutes']), idleMinutes = Number(values['idle-minutes']);
-  if (![sessionMinutes, idleMinutes].every(value => Number.isInteger(value) && value >= 0 && value <= 10080)) throw new Error('Timeouts must be 0..10080 minutes; 0 disables endpoint timeout (relay maximum 7 days)');
+  if (![sessionMinutes, idleMinutes].every(value => Number.isInteger(value) && value >= 0 && value <= 10080)) throw new Error('Timeouts must be 0..10080 minutes; 0 disables that endpoint timeout');
   if (command === 'devices') { console.log(JSON.stringify(new PairingStore(join(homedir(), '.diagnose', 'pairings')).list('operator').map(({ name, id, relay }) => ({ name, id, relay })), null, 2)); return; }
   if (command === 'forget') { const store = new PairingStore(join(homedir(), '.diagnose', 'pairings')); store.remove(store.get(values.device ?? '', 'operator').id); console.log('Local pairing removed. Revoke on the user computer to invalidate its credential.'); return; }
   if (command === 'mcp') { await serveMcp(relay, values.device, values.case); return; }
-  if (!['start', 'connect', 'terminal', 'pair'].includes(command)) { console.log(`diagnose start|connect|terminal|mcp [relay-url] [--device NAME]\ndiagnose pair [relay-url] --name NAME\ndiagnose history\ndiagnose show ID [--cursor OFFSET]\ndiagnose cleanup [--days 7]\ndiagnose devices\ndiagnose forget --device NAME\n${agentUsage}\n${skillsUsage}\n${knowledgeUsage}\nNode.js >=20.10. Pairing codes are entered interactively, never as arguments.`); return; }
+  if (!['start', 'connect', 'terminal', 'pair'].includes(command)) { console.log(`diagnose start|connect|terminal|mcp [relay-url] [--device NAME]\ndiagnose pair [relay-url] --name NAME\ndiagnose history\ndiagnose show ID [--cursor OFFSET]\ndiagnose cleanup [--days 7]\ndiagnose devices\ndiagnose forget --device NAME\n${agentUsage}\n${(await import('./install-skill.js')).installSkillUsage}\n${skillsUsage}\n${knowledgeUsage}\nNode.js >=20.10. Pairing codes are entered interactively, never as arguments.`); return; }
   if (!stdin.isTTY || !stdout.isTTY) throw new Error('Interactive terminal required. AI clients should use diagnose mcp.');
   const rl = createInterface({ input: stdin, output: stdout });
   const shutdown = new AbortController(); let peer: Peer | undefined, engine: ProbeEngine | undefined;
@@ -70,6 +79,16 @@ async function main(): Promise<void> {
     if (command === 'start') {
       const store = new PairingStore();
       console.log('Task details and collected results are saved in encrypted local history for up to 7 days (256 MiB budget). View with diagnose history / diagnose show ID; remove inactive records with diagnose cleanup --days 0. Scripts may contain sensitive data.');
+      let nextSessionApproval: 'review' | 'tasks' | 'everything' = 'review';
+      if (!store.list('host').length) {
+        console.log('Auto approval lets the diagnostician run tasks with your OS permissions and receive results without further prompts.');
+        console.log('Approve everything also lets anyone with the next one-time invitation connect without confirmation. Share that invitation privately.');
+        const choice = (await rl.question('Task approval for the next session? [Enter=review / a=auto tasks only / e=approve everything] ', { signal: shutdown.signal })).trim().toLowerCase();
+        nextSessionApproval = choice === 'e' ? 'everything' : choice === 'a' ? 'tasks' : 'review';
+        console.log(nextSessionApproval === 'everything' ? 'Approve everything selected for this temporary invitation: connection, task execution, and result transmission.'
+          : nextSessionApproval === 'tasks' ? 'Auto approval selected for the next temporary session, subject to your pairing confirmation.'
+            : 'You will review task execution and result transfers.');
+      }
       const firstAudit = new Audit(); resources = new SessionResources(join(homedir(), '.diagnose', 'resources'), firstAudit); let sessions = 0;
       while (!shutdown.signal.aborted) {
       let remembered: import('./pairing.js').Pairing | undefined = store.list('host')[0];
@@ -81,11 +100,25 @@ async function main(): Promise<void> {
         if (remembered) { audit.record('pairing.reconnected', { id: remembered.id }); return !remembered.paused; }
         if (remember) console.log('REMEMBER THIS DIAGNOSTICIAN: this computer will accept future connections using a new private credential until you type "unpair". Task approval remains enabled. AUTO lasts one hour, across reconnects.');
         console.log(`\nRequested by: ${safeText(label)} (self-asserted identity)\nFingerprint: ${fingerprint}\nResults will be available to the diagnostician and their AI provider.`);
-        console.log('Choose y: approve each task/batch and its transfer.\nChoose a: grant automatic execution AND transmission (one hour if remembered; otherwise this temporary session).\nAUTO: commands have your OS permissions; results go to the diagnostician and their AI without further prompts. Raw terminal, file and tunnel channels are NOT redacted. A channel grant includes continuing input/output within its scope.\nRevoke locally with "permissions ask", cancel with "cancel", or end with Ctrl+C. Already transmitted data cannot be recalled.');
-        const answer = (await rl.question(remember ? 'Remember and allow this diagnostician? [y / a=auto for 1 hour / N] ' : 'Allow this temporary diagnostic session? [y / a=auto / N] ', { signal })).trim().toLowerCase();
-        const allowed = answer === 'y' || answer === 'a';
+        if (!remember && nextSessionApproval === 'everything') {
+          signal.throwIfAborted();
+          nextSessionApproval = 'review';
+          audit.record('session.pairing-decision', { allowed: true, fingerprint, approval: 'everything' });
+          engine!.setPermissionMode('auto');
+          console.log('Connection approved by your startup selection (Approve everything).');
+          return true;
+        }
+        const preselectedAuto = nextSessionApproval === 'tasks' && !remember;
+        console.log(preselectedAuto ? 'You selected auto approval at startup. Choose y to confirm it or r to connect with per-task review.' : 'Choose y: approve each task/batch and its transfer.\nChoose a: grant automatic execution AND transmission (one hour if remembered; otherwise this temporary session).');
+        console.log('AUTO: commands have your OS permissions; results go to the diagnostician and their AI without further prompts. Raw terminal, file and tunnel channels are NOT redacted. A channel grant includes continuing input/output within its scope.\nRevoke locally with "permissions ask", cancel with "cancel", or end with Ctrl+C. Already transmitted data cannot be recalled.');
+        const prompt = preselectedAuto ? 'Allow this temporary session with auto approval? [y / r=review / N] '
+          : remember ? 'Remember and allow this diagnostician? [y / a=auto for 1 hour / N] ' : 'Allow this temporary diagnostic session? [y / a=auto / N] ';
+        const answer = (await rl.question(prompt, { signal })).trim().toLowerCase();
+        const auto = preselectedAuto ? answer === 'y' : answer === 'a';
+        const allowed = answer === 'y' || (preselectedAuto ? answer === 'r' : auto);
+        if (allowed) nextSessionApproval = 'review';
         if (allowed && remember) { provision = createCode(); remembered = store.add({ role: 'host', name: 'diagnostician', label, relay, code: provision }); audit.record('pairing.remembered', { id: remembered.id }); }
-        if (answer === 'a') { engine!.setPermissionMode('auto'); if (remembered) { remembered.autoUntil = Date.now() + 3600000; store.save(remembered); scheduleGrant(); } }
+        if (auto) { engine!.setPermissionMode('auto'); if (remembered) { remembered.autoUntil = Date.now() + 3600000; store.save(remembered); scheduleGrant(); } }
         audit.record('session.pairing-decision', { allowed, fingerprint }); return allowed;
       } });
       engine = new ProbeEngine(peer, async request => {
@@ -112,7 +145,7 @@ async function main(): Promise<void> {
           else console.log('No pending grant. First type "permissions auto" and read its explanation.');
           return true;
         }
-        if (value === 'permissions ask') { autoRequestedAt = 0; clearTimeout(grantTimer); if (remembered) { remembered.autoUntil = 0; store.save(remembered); } engine!.setPermissionMode('ask'); engine!.cancelAll(); void resources!.revoke().catch(error => console.error(safeText((error as Error).message))); console.log('Approval required. Automatic permissions revoked; any active work is cancelled.'); return true; }
+        if (value === 'permissions ask') { nextSessionApproval = 'review'; autoRequestedAt = 0; clearTimeout(grantTimer); if (remembered) { remembered.autoUntil = 0; store.save(remembered); } engine!.setPermissionMode('ask'); engine!.cancelAll(); void resources!.revoke().catch(error => console.error(safeText((error as Error).message))); console.log('Approval required. Automatic permissions revoked; any active work is cancelled.'); return true; }
         if (value === 'cancel') { engine!.cancelAll(); void resources!.revoke().catch(error => console.error(safeText((error as Error).message))); console.log('Cancellation requested for the current task/batch and retained resources.'); return true; }
         if (value === 'jobs') { console.log(safeText(JSON.stringify(resources!.listLocal(), null, 2))); return true; }
         if (value.startsWith('recover ')) { const id = value.slice(8).trim(); console.log(`Resource: ${id}\nNew recovery credential (share privately): ${resources!.renewCredential(id)}`); return true; }
@@ -137,6 +170,7 @@ async function main(): Promise<void> {
         await peer.open();
         console.log(remembered ? `Remembered diagnostician: ${safeText(remembered.label)}. Waiting for connections. Local commands: pairing, pause, resume, unpair, permissions ask, permissions auto [forever], cancel, jobs, exit. Audit: ${audit.path}` : `Relay: ${relay}\nAudit: ${audit.path}\nPairing code (30 minutes, one-time, share privately):\n${code}\nCtrl+C ends the session and cancels active tasks.`);
         console.log(`Session ended: ${safeText(await peer.ended)}`);
+        if (nextSessionApproval === 'everything') nextSessionApproval = 'review';
       } catch (error) { const collision = (error as Error).message.includes('Invitation locator occupied'); if (!shutdown.signal.aborted) console.log(collision ? 'Choosing another invitation code...' : `Relay unavailable: ${safeText((error as Error).message)}. Retained work remains local; retrying in 3 seconds.`); await delay(collision ? 100 : 3000, undefined, { signal: shutdown.signal }).catch(() => {}); }
       finally { clearTimeout(grantTimer); rl.off('line', onLocalLine); }
       active = false; if (secretPending) await secretPending;

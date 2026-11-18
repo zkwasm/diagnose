@@ -81,13 +81,6 @@ For shell syntax such as pipes and conditionals, the agent names the shell expli
 
 ## From a reported problem to a verified result
 
-Suppose plug readings stopped arriving from an OWON gateway connected by USB serial. Start with a prompt like this:
+Start with the actual symptom, where the device is connected, and what you need to see working. Have the agent collect read-only evidence and explain the next check. For a proposed change, ask what it will affect and how to restore the original setting. The [probe's permissions](on-site.md#choose-and-change-permissions) govern execution and result sharing. Repeat the original check after an authorized repair and ask the agent to summarize the result.
 
-> The OWON gateway stopped reporting plug readings. Start with read-only checks. Confirm which serial port belongs to the gateway, look for recent readings or errors, and tell me what the evidence supports. Ask before changing anything. We’ll consider it fixed when fresh readings appear again.
-
-1. **Identify the interface.** The agent can list serial ports with `system.inspect`. If several ports match, confirm the right one and the baud rate with the person on site before opening it.
-2. **Collect a baseline and follow the evidence.** Use `serial.capture` for a short sample. If the sample is silent, check whether the port, baud rate, or cable is correct. If the gateway responds but readings are still absent, inspect the relevant collector logs with `file.read` if available. Reuse the same session to ask for another check.
-3. **Review one proposed change.** If the evidence points to a setting, ask the agent to show the current value, explain the proposed edit, and describe how to restore the original value. The [probe's permissions](on-site.md#choose-and-change-permissions) govern execution and result sharing. You can end the diagnosis after the read-only findings.
-4. **Repeat the original check.** After an authorized repair, use the same capture or status check to look for fresh readings. If they are still missing, use that result to choose the next check. Ask the agent to summarize the evidence, changes, and any remaining uncertainty.
-
-Tell the agent when to stop. The on-site user can also end access from the probe terminal. Use the same workflow for a problem on the on-site computer itself. Pick a check that measures whether the original symptom is gone, such as a successful application start or a working device connection.
+The [diagnostic walkthroughs](examples.md) show this conversation for a USB gateway, a network device, a factory data collector, and an application on the on-site computer. Each includes a prompt you can adapt and examples of how to follow the evidence.

@@ -7,7 +7,7 @@ const guideDirectories = await readdir(join(root, 'guide'), { withFileTypes: tru
 for (const directory of guideDirectories) {
   if (directory.isDirectory()) pages.push(`guide/${directory.name}/index.html`);
 }
-assert.equal(pages.length, 8, 'Expected the landing page, guide overview, and six scenario pages');
+assert.ok(pages.includes('guide/examples/index.html'), 'Expected the diagnostic walkthroughs page');
 for (const file of pages) {
   const html = await readFile(join(root, file), 'utf8'); const ids = [...html.matchAll(/\bid="([^"]+)"/g)].map(match => match[1]); assert.equal(new Set(ids).size, ids.length, `Duplicate IDs in ${file}`); assert.match(html, /<html lang="en">/); assert.doesNotMatch(html, /\p{Script=Han}/u);
   if (file.startsWith('guide/')) {

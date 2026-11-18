@@ -11,6 +11,7 @@ await copyFile(join(root, 'site/video-poster.svg'), join(out, 'media/video-poste
 await cp(join(root, 'site/media'), join(out, 'media'), { recursive: true });
 const guides = [
   { file: 'USER_GUIDE.md', url: '/guide/', title: 'Guide overview' },
+  { file: 'docs/guide/examples.md', url: '/guide/examples/', title: 'Diagnostic walkthroughs' },
   { file: 'docs/guide/on-site.md', url: '/guide/on-site/', title: 'Receive remote help' },
   { file: 'docs/guide/diagnose.md', url: '/guide/diagnose/', title: 'Diagnose a remote device' },
   { file: 'docs/guide/reconnect.md', url: '/guide/reconnect/', title: 'Return to a saved device' },

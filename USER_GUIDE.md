@@ -4,11 +4,22 @@ Diagnose lets a remote AI agent inspect and troubleshoot a device through a comp
 
 ## Choose your scenario
 
+Pick the closest example. Each one shows what to prepare on site, what to ask the agent, and how to tell whether the problem is fixed.
+
+| What you see | Walkthrough |
+| --- | --- |
+| The IoT gateway has power, but its USB serial logs are missing. | [Find out why a USB gateway is silent](docs/guide/examples.md#a-usb-gateway-is-silent) |
+| A device on the local network appears offline in an app. | [Check whether the device or its app is offline](docs/guide/examples.md#a-network-device-appears-offline) |
+| A machine is running, but new readings stopped reaching the factory dashboard. | [Trace missing readings through an industrial PC](docs/guide/examples.md#factory-readings-stopped-arriving) |
+| An application on the on-site computer fails after a configuration change. | [Check a failed application startup](docs/guide/examples.md#an-application-wont-start) |
+
+## Choose your setup or workflow
+
 | If you want to… | Go to |
 | --- | --- |
 | Connect for the first time | [Quick start](#quick-start) |
 | Get help with your device | [Receive remote help](docs/guide/on-site.md) |
-| Use Claude Code, Codex, or Gemini to diagnose a device | [Diagnose a remote device](docs/guide/diagnose.md) |
+| Set up Claude Code, Codex, or Gemini to diagnose a device | [Diagnose a remote device](docs/guide/diagnose.md) |
 | Reconnect without exchanging a new invitation | [Return to a saved device](docs/guide/reconnect.md) |
 | Load a device procedure or learn from a completed diagnosis | [Reuse and improve procedures](docs/guide/procedures.md) |
 | Start Diagnose from a script or use your own MCP client | [Automation and tool reference](docs/guide/automation.md) |
@@ -83,7 +94,7 @@ The agent loads the procedure and starts working through it. If it needs an invi
 
 Unless the on-site user chose **Approve everything**, they check the diagnostician's label and connection fingerprint before approving. The probe shows which permissions each choice grants. Auto approval covers both execution and result transmission. Commands run with the user's OS permissions, and results can reach the diagnostician and their AI provider.
 
-The agent reports [pairing status and the first device check](docs/guide/diagnose.md#run-a-diagnostic-session) separately. Ask it to start with a read-only check, explain what it finds, and verify the original symptom after any authorized repair. See [what the skill can do](docs/guide/diagnose.md#what-the-native-skill-can-do) and [a worked diagnosis example](docs/guide/diagnose.md#from-a-reported-problem-to-a-verified-result).
+The agent reports [pairing status and the first device check](docs/guide/diagnose.md#run-a-diagnostic-session) separately. Ask it to start with a read-only check, explain what it finds, and verify the original symptom after any authorized repair. See [what the skill can do](docs/guide/diagnose.md#what-the-native-skill-can-do) and [choose a diagnostic walkthrough](docs/guide/examples.md).
 
 The user can type `permissions ask` to revoke automatic approval or `exit` to stop access. See [how to review what was collected and sent](docs/guide/troubleshooting.md#review-local-history-and-clean-up).
 

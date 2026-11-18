@@ -54,7 +54,7 @@ diagnose agent codex
 
 Short invitations require **0.7.0+ on both endpoints** and the updated relay. They last 30 minutes, tolerate case/spaces/hyphens, and still require local approval. Existing remembered pairings remain valid. See the [protocol design](PAIRING_PROTOCOL.md).
 
-For a custom automation client, run `diagnose mcp` as a stdio subprocess. See the [native setup](USER_GUIDE.md#use-diagnose-as-a-native-agent-skill) and [automation setup](USER_GUIDE.md#8-manual-operation-and-other-mcp-clients) for the two entry points.
+For a custom automation client, run `diagnose mcp` as a stdio subprocess. See the [native setup](docs/guide/diagnose.md#use-diagnose-as-a-native-agent-skill) and [automation setup](docs/guide/automation.md#direct-cli-and-other-mcp-clients) for the two entry points.
 
 ## Pair once, return later
 
@@ -67,7 +67,7 @@ diagnose agent codex --device alice-pc --skill ./devices/owon.md
 # Same options for claude or gemini; --skill is optional.
 ```
 
-Restart the agent whenever needed without a new code. Pairing persists across probe restarts, but access requires the foreground probe. Task approval remains the default. The user may grant automatic execution and transmission for one hour, or explicitly until revoked. Local `pause`, `permissions ask`, and `unpair` control access. Interrupted modifications are never automatically replayed. See the [pairing guide](USER_GUIDE.md#keep-a-device-paired-for-future-diagnosis).
+Restart the agent whenever needed without a new code. Pairing persists across probe restarts, but access requires the foreground probe. Task approval remains the default. The user may grant automatic execution and transmission for one hour, or explicitly until revoked. Local `pause`, `permissions ask`, and `unpair` control access. Interrupted modifications are never automatically replayed. See the [pairing guide](docs/guide/reconnect.md#keep-a-device-paired-for-future-diagnosis).
 
 ## Start with a device skill or Markdown task
 
@@ -81,13 +81,13 @@ diagnose agent gemini --skill ./devices/owon.md
 
 A directory is also accepted: `--skill ./skills/my-device` reads its `SKILL.md`. Relative references remain based on that file's original directory. Diagnose snapshots the entry and supplies a startup task that tells the agent to read it and begin, instead of waiting for you to repeat the task. It asks for a pairing code or other missing target details when needed.
 
-This is a session task, not a global native-skill installation or an additional permission grant. User approvals and the agent's own tool permissions still apply. Instructions can be sent to your AI provider. See the [guide](USER_GUIDE.md#start-with-a-device-skill-or-markdown-task) and [examples](https://github.com/zkwasm/diagnose/tree/main/examples/skills).
+This is a session task, not a global native-skill installation or an additional permission grant. User approvals and the agent's own tool permissions still apply. Instructions can be sent to your AI provider. See the [guide](docs/guide/procedures.md#start-with-a-device-skill-or-markdown-task) and [examples](https://github.com/zkwasm/diagnose/tree/main/examples/skills).
 
 ## Keep and improve device knowledge
 
 Version 0.6 adds device diagnosis cases, evidence-linked conclusions, reviewed skill drafts, a local versioned library and optional encrypted cross-computer synchronization. Tell your agent to create a case and propose a reusable procedure when useful. Review drafts locally; the agent cannot accept them through MCP. Complete skill bundles can be shared through the relay using a separate private recovery credential. Raw case logs are not synced automatically.
 
-See the [case and knowledge guide](USER_GUIDE.md#record-a-device-diagnosis-and-improve-your-procedures) and [security/operations design](KNOWLEDGE_SECURITY.md).
+See the [case and knowledge guide](docs/guide/procedures.md#record-a-device-diagnosis-and-improve-your-procedures) and [security/operations design](KNOWLEDGE_SECURITY.md).
 
 ## From problem to verified result
 
@@ -97,7 +97,7 @@ See the [case and knowledge guide](USER_GUIDE.md#record-a-device-diagnosis-and-i
 4. **Act with permission:** use approved commands, scripts, or file changes to carry out the fix.
 5. **Verify and hand off:** repeat the original check, summarize changes, and identify any remaining issues.
 
-This is an agent-guided workflow using the existing tools and permission model. Diagnose does not automatically prove a repair succeeded or roll back arbitrary changes. See the [troubleshooting workflow](USER_GUIDE.md#from-a-reported-problem-to-a-verified-result).
+This is an agent-guided workflow using the existing tools and permission model. Diagnose does not automatically prove a repair succeeded or roll back arbitrary changes. See the [troubleshooting workflow](docs/guide/diagnose.md#from-a-reported-problem-to-a-verified-result).
 
 ## Remote tools
 
@@ -125,7 +125,7 @@ No device-specific integration is required in the probe. An approved script can 
 - Local audit logs record decisions, targets, hashes, byte counts, and outcomes. Encrypted history keeps exact task requests, finite collected results, approvals, and send events: use `diagnose history`, `diagnose show ID`, and `diagnose cleanup --days 0`. History and resource journals each have a 256 MiB / 2,000-record budget and seven-day inactive retention. They do not reconstruct every side effect of an arbitrary program. Changes are not automatically rolled back.
 - `permissions ask`, `cancel`, and `Ctrl+C` are local controls. Data already transmitted cannot be recalled.
 
-Read the [user guide](USER_GUIDE.md#security-and-local-data) before operating a session. The protocol has not received an independent security audit.
+Read the [user guide](docs/guide/troubleshooting.md#security-and-local-data) before operating a session. The protocol has not received an independent security audit.
 
 ## Development
 

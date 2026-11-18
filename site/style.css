@@ -140,6 +140,8 @@ details[open] summary:after { content: '−'; }
 .guide-toc { font-size: 15px; line-height: 1.7; position: sticky; top: 30px; height: max-content; }
 .guide-toc a { display: block; padding: 9px 0; color: var(--muted); }
 .guide-toc strong { font: 12px var(--mono); letter-spacing: 1px; color: var(--accent); display: block; margin-bottom: 20px; }
+.guide-toc nav + nav { margin-top: 24px; }
+.guide-toc a[aria-current="page"] { color: var(--accent); font-weight: 600; }
 .guide-content { font-size: 20px; line-height: 1.85; min-width: 0; }
 .guide-content h1 { font-size: 66px; letter-spacing: -2.2px; line-height: 1.15; margin-bottom: 34px; }
 .guide-content h2 { font-size: 43px; letter-spacing: -1px; margin: 64px 0 25px; padding-top: 25px; border-top: 1px solid var(--line); }
@@ -221,6 +223,7 @@ details[open] summary:after { content: '−'; }
   .guide-layout { grid-template-columns: minmax(0, 1fr); gap: 32px; padding-block: 40px 70px; }
   .guide-toc { position: static; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 20px; border-bottom: 1px solid var(--line); padding-bottom: 24px; }
   .guide-toc strong { grid-column: 1 / -1; }
+  .guide-toc nav + nav { margin-top: 0; }
   .hero { grid-template-columns: 1fr; padding-block: 58px; gap: 45px; }
   h1 { line-height: 1.3; }
   .hero-text { max-width: none; font-size: 20px; }

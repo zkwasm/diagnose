@@ -19,6 +19,7 @@
     "dist",
     "README.md",
     "USER_GUIDE.md",
+    "docs/guide",
     "LICENSE",
     "npm-shrinkwrap.json",
     "src",

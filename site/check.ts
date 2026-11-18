@@ -1,10 +1,18 @@
 import assert from 'node:assert/strict';
-import { readFile, access } from 'node:fs/promises';
+import { readFile, access, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import vm from 'node:vm';
 const root = '.site-dist', pages = ['index.html', 'guide/index.html'];
+const guideDirectories = await readdir(join(root, 'guide'), { withFileTypes: true });
+for (const directory of guideDirectories) {
+  if (directory.isDirectory()) pages.push(`guide/${directory.name}/index.html`);
+}
+assert.equal(pages.length, 8, 'Expected the landing page, guide overview, and six scenario pages');
 for (const file of pages) {
   const html = await readFile(join(root, file), 'utf8'); const ids = [...html.matchAll(/\bid="([^"]+)"/g)].map(match => match[1]); assert.equal(new Set(ids).size, ids.length, `Duplicate IDs in ${file}`); assert.match(html, /<html lang="en">/); assert.doesNotMatch(html, /\p{Script=Han}/u);
+  if (file.startsWith('guide/')) {
+    assert.ok(html.includes(`href="/${file.replace('index.html', '')}" aria-current="page"`), `Missing current scenario in ${file}`);
+  }
   for (const [, link] of html.matchAll(/(?:href|src|poster)="([^"]+)"/g)) {
     if (/^(https?:|mailto:)/.test(link)) continue;
     const [resource, anchor] = link.split('#'), path = resource.split('?')[0]; let target = path.startsWith('/') ? path.slice(1) : path ? path : file;

@@ -28,7 +28,7 @@ function helper(action: string, input: Record<string, unknown>): Promise<Record<
   });
 }
 
-test('native Skill helper pairs once, reuses the connection for a repair and closes it', { timeout: 30000 }, async () => {
+test('native Skill helper pairs once, runs a shell command, reuses the connection for a repair and closes it', { timeout: 30000 }, async () => {
   const scratch = await mkdtemp(join(tmpdir(), 'diagnose-skill-'));
   const config = join(scratch, 'config.txt');
   await writeFile(config, 'offline\n');
@@ -58,13 +58,19 @@ test('native Skill helper pairs once, reuses the connection for a repair and clo
     const inspection = await run('system.inspect', {});
     assert.equal(inspection.result.data.platform, process.platform);
     assert.ok(Array.isArray(inspection.result.data.serialPorts));
+    const command = process.platform === 'win32'
+      ? { executable: 'powershell.exe', args: ['-NoProfile', '-NonInteractive', '-Command', '40 + 2'] }
+      : { executable: '/bin/sh', args: ['-c', 'printf "%s" "$((40 + 2))"'] };
+    const executed = await run('process.run', { ...command, cwd: scratch, timeoutMs: 5000 });
+    assert.equal(executed.result.status, 'ok');
+    assert.equal(executed.outputs.stdout.trim(), '42');
     assert.equal((await run('file.read', { path: config })).outputs.file, 'offline\n');
     const expectedSha256 = createHash('sha256').update('offline\n').digest('hex');
     assert.equal((await run('file.write', { path: config, content: 'online\n', expectedSha256 })).result.status, 'ok');
     assert.equal((await run('file.read', { path: config })).outputs.file, 'online\n');
     assert.equal(await readFile(config, 'utf8'), 'online\n');
     assert.equal(pairs, 1);
-    assert.deepEqual(approvals, ['execute', 'send', 'execute', 'send', 'execute', 'send', 'execute', 'send']);
+    assert.deepEqual(approvals, ['execute', 'send', 'execute', 'send', 'execute', 'send', 'execute', 'send', 'execute', 'send']);
     const handle = session;
     assert.equal((await helper('close', { session })).disconnected, true);
     session = undefined;

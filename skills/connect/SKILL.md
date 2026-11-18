@@ -57,4 +57,6 @@ Report what was checked, what changed, and what remains uncertain when a repair 
 
 For file operations, supply a `path`. Prefer the observed SHA-256 as `expectedSha256` when overwriting a file with `file.write`. For `process.run`, supply an `executable` and an `args` array. For serial operations, supply `path`, `baudRate`, and `durationMs`.
 
+Use `process.run` for shell commands on the on-site computer. Choose the shell for the OS reported by `system.inspect`. For POSIX shell syntax on macOS or Linux, use `executable: "/bin/sh"` and `args: ["-c", "pwd"]`. On Windows, use `executable: "powershell.exe"` and `args: ["-NoProfile", "-NonInteractive", "-Command", "Get-Location"]`. Pass an explicit working directory if the command depends on one. For a single program, pass its executable and arguments directly. Submit the operation through Diagnose and use `diagnose_wait` to read its exit status, stdout, and stderr.
+
 Keep short-lived secrets out of arguments by feeding JSON with the shell's stdin facility. For POSIX shells, use a quoted heredoc. In PowerShell, pipe a single-quoted here-string.

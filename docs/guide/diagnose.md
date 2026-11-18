@@ -58,12 +58,18 @@ The agent uses these operations on the **on-site computer** through the probe. T
 | Find a known log or configuration file, inspect its metadata, and read the relevant contents. | `file.list`, `file.stat`, `file.read` |
 | Capture output from a confirmed serial port at the device's baud rate. | `serial.capture` |
 | Send a documented request to the device over serial and read its reply. | `serial.exchange` |
-| Run a finite check with an installed program, such as a vendor utility that reports device status. | `process.run` |
+| Run a shell command or installed program on the on-site computer, such as a vendor utility that reports device status. | `process.run` |
 | Apply an authorized configuration edit to a file on the on-site computer. | `file.write` |
 
 The agent submits one operation with `diagnose_start` or groups related operations with `diagnose_batch`. It uses `diagnose_wait` to get the result and `diagnose_cancel` to request cancellation of work in progress. Cancellation does not undo changes already made. You can describe the check in plain language. The agent selects the operation and waits for any approval the probe requires.
 
 The native skill supports temporary pairing and finite operations. For live terminals, file transfers, remembered pairings, or case management, [launch the agent with Diagnose MCP](automation.md#launch-an-agent-with-diagnose-mcp). A [device procedure](procedures.md#start-with-a-device-skill-or-markdown-task) can tell the agent which checks and verification steps to use for a particular model.
+
+### Run a shell command on the on-site computer
+
+Ask in chat, for example, “Use Diagnose to check the working directory on the on-site computer and show me the result.” The agent submits `process.run` through the probe and waits for the exit status, standard output, and standard error.
+
+For shell syntax such as pipes and conditionals, the agent names the shell explicitly. On macOS or Linux, `process.run` can launch `/bin/sh` with `[-c, pwd]`. On Windows, it can launch `powershell.exe` with `[-NoProfile, -NonInteractive, -Command, Get-Location]`. The agent can also call an installed program directly with an executable and an argument list. Commands follow the probe's execution and result-sharing permissions.
 
 ## From a reported problem to a verified result
 

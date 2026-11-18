@@ -155,7 +155,7 @@ SOCKS defaults to `allowedHosts:["*"]`, which permits any target. Narrow it when
 | Active live resource handles | 128 |
 | Live process | 1 hour by default; `timeoutMs:0` removes its timer |
 | Retained output per live process | 64 MiB by default; 1 GiB maximum; reaching the cap terminates the process |
-| Relay session | The updated relay renews an active room without a fixed total. Older relays may cap a room at seven days. |
+| Relay session | Relays running 0.8+ renew active rooms. The hosted relay currently runs 0.7 and caps a room at seven days with a 0.8+ probe using default session settings. |
 
 ```sh
 diagnose start --session-minutes 240 --idle-minutes 30

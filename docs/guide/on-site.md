@@ -132,7 +132,7 @@ Type these into the user's probe terminal:
 | `cancel` | Cancel current work and retained resources without changing the permission mode. |
 | `exit` or `Ctrl+C` | End the probe and close its resources. |
 
-Only the user can enable automatic mode. Remote requests cannot switch it on. New pairings start with manual approval unless the user explicitly chooses `a` again. Already transmitted data cannot be recalled. Completed changes are not automatically rolled back.
+Only the user can enable automatic mode. For each new invitation, choose per-task review, `a` for automatic tasks and results with a pairing prompt, or `e` to preapprove the connection too. Already transmitted data cannot be recalled. Completed changes are not automatically rolled back.
 
 Do not ask the AI to collect OS passwords. For interactive authentication, the user can use local hidden input with a trusted foreground program; Diagnose does not automatically elevate privileges. Hidden input has not been validated on Windows. On macOS/Linux, ordinary descendants in a managed process group are terminated when its leader exits or the resource is closed. This is not OS sandbox containment: a deliberately detached daemon can escape that group; Windows process-tree termination still requires real-device validation.
 

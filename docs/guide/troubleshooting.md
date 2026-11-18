@@ -62,7 +62,7 @@ Both endpoints at 0.5.0+ use increasing task sequence numbers, so a connection c
 
 ### Saved output and recovery data
 
-Raw live output and recovery metadata are stored under `~/.diagnose/resources` using AES-256-GCM records. The local key has mode `0600` in the same account's directory. This protects stored ciphertext from casual inspection, not an attacker who controls that OS account and can read the key. Saved output is not automatically pruned; clean it up when it is no longer needed.
+Raw live output and recovery metadata are stored under `~/.diagnose/resources` using AES-256-GCM records. The local key has mode `0600` in the same account's directory. This protects stored ciphertext from casual inspection, not an attacker who controls that OS account and can read the key. Inactive saved output follows the resource journal retention limits above. Use `diagnose cleanup` to remove eligible records on demand.
 
 Finite text results receive best-effort common-credential redaction and terminal-control filtering. Regexes cannot identify every secret. Live terminals, exact file transfers, and TCP channels retain raw data and are not redacted. Collection and transmission are audited separately.
 

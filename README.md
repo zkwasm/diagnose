@@ -4,13 +4,13 @@
 
 Diagnose is an open-source tool for agent-led remote troubleshooting and problem resolution. It gives Codex, Claude Code, Gemini CLI, or another MCP client the remote tools to investigate gateways, controllers and other devices reachable from an on-site computer, apply authorized fixes, and verify the result. A user-controlled probe and an end-to-end encrypted relay provide the connection.
 
-[User guide](USER_GUIDE.md) · [Source](https://github.com/zkwasm/diagnose) · [npm](https://www.npmjs.com/package/@masstensor/diagnose) · [Website](https://diagnose.fenginwind.com)
+[Quick start](USER_GUIDE.md#quick-start) · [Diagnostic walkthroughs](docs/guide/examples.md) · [npm](https://www.npmjs.com/package/@masstensor/diagnose) · [Website](https://diagnose.fenginwind.com)
 
 Requires **Node.js 20.10+**. MIT licensed. TypeScript source is included in the npm package. macOS probes and the Linux relay have been tested. CI covers macOS/Linux and targeted Windows regressions; Windows interactive terminals and physical USB/serial behavior still need real-environment validation.
 
 ## Quick start
 
-On the computer being diagnosed:
+On the on-site computer connected to the device:
 
 ```sh
 npx @masstensor/diagnose@latest start
@@ -18,7 +18,7 @@ npx @masstensor/diagnose@latest start
 
 In v0.8+, press Enter to review tasks and results, choose `a` to approve tasks and results automatically after confirming the connection, or choose `e` to preapprove all three for this one-time invitation. Keep the terminal open and privately share its nine-letter invitation, such as `abc-def-ghi`, with the diagnostician.
 
-### Use Diagnose in your existing agent
+### Manual agent mode (recommended for a first session)
 
 Install once from this GitHub repository. The native Skill uses Diagnose 0.8.1 and starts the local runtime on demand through Node.js and npm.
 
@@ -28,31 +28,30 @@ Install once from this GitHub repository. The native Skill uses Diagnose 0.8.1 a
 | Codex CLI | `codex plugin marketplace add zkwasm/diagnose`, then `codex plugin add diagnose@diagnose` | `$diagnose:connect` in a new session. |
 | Gemini CLI | `gemini skills install https://github.com/zkwasm/diagnose.git --path skills/connect` | Ask Gemini to use the `connect` skill. |
 
-### Start from the command line or automate a diagnosis
-
-On the diagnostician's computer, use the npm launcher when a script or job needs to start and configure an agent:
+Open your agent, give it the private invitation and the device symptom, then guide the next checks in chat. You can also start an interactive session with Diagnose MCP already configured:
 
 ```sh
 npx @masstensor/diagnose@latest agent codex
 # Or: agent claude / agent gemini
 ```
 
-The agent launcher requires **0.3.1+**. It loads Diagnose MCP for this launch without adding a permanent MCP entry. Tell the agent:
+The launcher loads Diagnose MCP for this session. Tell the agent what to check:
 
-> Use Diagnose to connect to this pairing code: abc-def-ghi . Help resolve the user's application startup failure. First investigate without changing anything. Explain the cause, proposed fix, and risks. Apply only authorized changes, then check whether the application starts successfully and report anything still unresolved.
+> Use Diagnose with invitation abc-def-ghi. The OWON gateway is connected to the on-site computer by USB serial. Plug readings have stopped. Confirm the interface and look for relevant logs. Explain the evidence before proposing a change. We can verify recovery when fresh readings reach the dashboard.
+
+Diagnose 0.8.1 reports pairing progress. Check the [first device check](docs/guide/diagnose.md#run-a-diagnostic-session) for how to distinguish a connected probe, an identified interface, and an actual response from the device.
 
 The user grants permission locally, either when the connection arrives or in advance with **Approve everything**. Automatic task approval includes both execution and result transmission. Possessing a pairing code does not establish the diagnostician's real identity.
 
-For repeated use:
+### Start automatically with a device procedure
+
+If you have a Markdown procedure, pass its path when launching the agent:
 
 ```sh
-npm install -g @masstensor/diagnose@latest
-diagnose start
-# On the diagnostician's machine:
-diagnose agent codex
+npx @masstensor/diagnose@latest agent codex --skill ./device.md
 ```
 
-Short invitations require **0.7.0+ on both endpoints** and the updated relay. They last 30 minutes, tolerate case/spaces/hyphens, and still require local approval. Existing remembered pairings remain valid. See the [protocol design](PAIRING_PROTOCOL.md).
+Short invitations require **0.7.0+ on both endpoints** and a compatible relay. They last 30 minutes and are consumed by successful pairing. The site user authorizes pairing at the prompt or in advance by choosing **Approve everything**. Existing remembered pairings remain valid. See the [protocol design](PAIRING_PROTOCOL.md).
 
 For a custom automation client, run `diagnose mcp` as a stdio subprocess. See the [native setup](docs/guide/diagnose.md#use-diagnose-as-a-native-agent-skill) and [automation setup](docs/guide/automation.md#direct-cli-and-other-mcp-clients) for the two entry points.
 
@@ -100,6 +99,8 @@ See the [case and knowledge guide](docs/guide/procedures.md#record-a-device-diag
 This is an agent-guided workflow using the existing tools and permission model. Diagnose does not automatically prove a repair succeeded or roll back arbitrary changes. See the [troubleshooting workflow](docs/guide/diagnose.md#from-a-reported-problem-to-a-verified-result).
 
 ## Remote tools
+
+The [native skill](docs/guide/diagnose.md#what-the-native-skill-can-do) supports temporary pairing, progress updates, system inspection, serial diagnostics, bounded file operations, single shell commands, and batches. The full launcher and stdio MCP provide the wider tool set below, including whole scripts, live terminals, file transfers, and remembered connections.
 
 | Capability | Interface |
 | --- | --- |

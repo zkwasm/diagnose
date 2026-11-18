@@ -114,11 +114,11 @@ h2 { font-size: 60px; line-height: 1.1; letter-spacing: -2.2px; margin: 0; }
 .video-section p:not(.eyebrow):not(.fine) { font-size: 19px; line-height: 1.75; color: var(--muted); max-width: 420px; }
 .video-section video { display: block; width: 100%; aspect-ratio: 16/9; background: var(--surface); border: 1px solid var(--line); border-radius: 4px; }
 .get-started { border-block: 1px solid var(--line); padding-block: 80px; display: grid; grid-template-columns: .8fr 1fr; gap: 90px; align-items: center; }
-.get-started > div > p:not(.eyebrow) { color: var(--muted); font-size: 19px; line-height: 1.75; }
+.get-started > div:first-child > p:not(.eyebrow) { color: var(--muted); font-size: 19px; line-height: 1.75; }
 .install-card { background: var(--surface); border: 1px solid var(--line); border-radius: 4px; padding: 28px; }
-.install-card > .mono { display: block; color: var(--muted); margin-bottom: 22px; }
+.install-card > p { margin-block: 12px; }
 .install-card .command-line { border: 1px solid var(--line); border-radius: 3px; margin-top: 12px; background: #f9fcff; color: var(--ink); }
-.install-card .text-link { display: inline-block; margin-top: 22px; }
+.install-card .text-link { display: inline-block; margin-top: 8px; }
 .faq { padding-block: 90px 110px; display: grid; grid-template-columns: .8fr 1fr; gap: 90px; }
 .faq h2 { font-size: 43px; letter-spacing: -1px; }
 .faq details { border-top: 1px solid var(--line); }

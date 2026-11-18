@@ -20,7 +20,7 @@ In v0.8+, press Enter to review tasks and results, choose `a` to approve tasks a
 
 ### Manual agent mode (recommended for a first session)
 
-Install once from this GitHub repository. The native Skill uses Diagnose 0.8.2 and starts the local runtime on demand through Node.js and npm.
+Install once from this GitHub repository. The native Skill uses Diagnose 0.8.3 and starts the local runtime on demand through Node.js and npm.
 
 | Agent | Install | Use |
 | --- | --- | --- |
@@ -105,6 +105,7 @@ The [native skill](docs/guide/diagnose.md#what-the-native-skill-can-do) supports
 | Capability | Interface |
 | --- | --- |
 | Inspect OS, runtime, commands, privileges, and serial ports | `system.inspect` |
+| Inspect CPU use, parent processes, free disk space, and log growth | `system.performance` |
 | Execute commands or complete scripts; submit up to 32 sequential steps | `process.run`, `process.script`, `batch.run` |
 | Stream output, send stdin, resize a real PTY, and send signals | `process.open`, resource controls |
 | Keep an explicitly retained job running across network loss | `resource.resume` with its ID and recovery credential |
@@ -115,6 +116,8 @@ The [native skill](docs/guide/diagnose.md#what-the-native-skill-can-do) supports
 | Use a native remote terminal without an AI agent | `diagnose terminal` |
 
 No device-specific integration is required in the probe. An approved script can use tools already available on the user's computer. Diagnose does not implement the SSH wire protocol or accept `ssh`, `scp`, or `sftp` clients. It does not provide a desktop viewer, SSH agent/X11 forwarding, UDP, TUN, or public forwarding listeners.
+
+An agent can supply a stable `requestId` for a task and poll that ID for its original result. Repeating the same keyed submission within the same MCP process returns the original ID. [Task tracking and retries](docs/guide/automation.md#track-a-task-without-running-it-again)
 
 ## Trust and data boundaries
 

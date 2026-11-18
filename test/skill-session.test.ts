@@ -1,8 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { createHash } from 'node:crypto';
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { createHash, randomUUID } from 'node:crypto';
+import { mkdtemp, open, readFile, realpath, rm, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { createRelay } from '../dist/relay.js';
@@ -28,8 +28,8 @@ function helper(action: string, input: Record<string, unknown>, onProgress?: (st
   });
 }
 
-test('native Skill helper pairs once, runs a shell command, reuses the connection for a repair and closes it', { timeout: 60000 }, async () => {
-  const scratch = await mkdtemp(join(tmpdir(), 'diagnose-skill-'));
+test('native Skill pairs once, inspects performance, tracks repair retries, and closes', { timeout: 90000 }, async () => {
+  const scratch = await realpath(await mkdtemp(join(tmpdir(), 'diagnose-skill-')));
   const config = join(scratch, 'config.txt');
   await writeFile(config, 'offline\n');
   const relay = createRelay({ port: 0 });
@@ -38,9 +38,21 @@ test('native Skill helper pairs once, runs a shell command, reuses the connectio
   let pairs = 0;
   let approve!: (value: boolean) => void;
   const approval = new Promise<boolean>(resolve => { approve = resolve; });
+  let approveWrite!: () => void;
+  const pendingWrite = new Promise<void>(resolve => { approveWrite = resolve; });
+  let notifyTransfer!: () => void, approveTransfer!: () => void;
+  const transferReady = new Promise<void>(resolve => { notifyTransfer = resolve; });
+  const pendingTransfer = new Promise<void>(resolve => { approveTransfer = resolve; });
   const approvals: Array<string> = [];
   const host = new Peer({ role: 'host', code, relay: url, approvalTimeoutMs: 5000, accept: async () => { pairs++; return approval; } });
-  new ProbeEngine(host, async request => { approvals.push(request.stage); return true; }, new Audit(join(scratch, 'audit')));
+  new ProbeEngine(host, async request => {
+    approvals.push(request.stage);
+    if (request.task.operation === 'file.write') {
+      if (request.stage === 'execute') await pendingWrite;
+      else { notifyTransfer(); await pendingTransfer; }
+    }
+    return true;
+  }, new Audit(join(scratch, 'audit')));
   let session: string | undefined;
   try {
     await host.open();
@@ -77,19 +89,63 @@ test('native Skill helper pairs once, runs a shell command, reuses the connectio
     const executed = await run('process.run', { ...command, cwd: scratch, timeoutMs: 15000 });
     assert.equal(executed.result.status, 'ok', JSON.stringify(executed.result));
     assert.equal(executed.outputs.stdout.trim(), '42');
+
+    const logPath = join(scratch, 'growing.log');
+    const log = await open(logPath, 'wx');
+    const writer = spawn(process.execPath, ['-e', 'process.stdout.write("ready\\n"); setInterval(() => process.stdout.write("tick\\n"), 50)'], {
+      cwd: scratch, stdio: ['ignore', log.fd, 'ignore'],
+    });
+    const writerEnded = new Promise(resolve => writer.once('close', resolve));
+    try {
+      const args = { pids: [writer.pid], diskPath: scratch, logPaths: process.platform === 'win32' ? [logPath] : [] };
+      const performance = await run('system.performance', args);
+      assert.equal(performance.result.status, 'ok');
+      const { processes, disk, logs, processStatus } = performance.result.data;
+      assert.equal(processStatus, 'sampled');
+      assert.equal(processes[0]?.pid, writer.pid);
+      assert.equal(processes[0].ppid, process.pid);
+      assert.ok(processes[0].elapsed);
+      assert.ok(disk.availableBytes > 0);
+      const sample = logs.find((entry: { path: string }) => entry.path === logPath);
+      assert.ok(sample, JSON.stringify(logs));
+      assert.equal(sample.state, 'sampled');
+      assert.ok(sample.deltaBytes > 0);
+      if (process.platform !== 'win32') assert.deepEqual(sample.pids, [writer.pid]);
+    } finally {
+      writer.kill();
+      await writerEnded;
+      await log.close();
+    }
+
     assert.equal((await run('file.read', { path: config })).outputs.file, 'offline\n');
     const expectedSha256 = createHash('sha256').update('offline\n').digest('hex');
-    assert.equal((await run('file.write', { path: config, content: 'online\n', expectedSha256 })).result.status, 'ok');
+    const repair = { requestId: randomUUID(), operation: 'file.write', arguments: { path: config, content: 'online\n', expectedSha256 }, reason: 'Repair the isolated demo configuration' };
+    assert.deepEqual(await call('diagnose_start', repair), { id: repair.requestId });
+    assert.deepEqual(await call('diagnose_wait', { id: repair.requestId, timeoutMs: 0 }), { id: repair.requestId, pending: true, stage: 'awaiting-start', state: 'pending' });
+    assert.deepEqual(await call('diagnose_start', repair), { id: repair.requestId });
+    await assert.rejects(call('diagnose_start', { ...repair, reason: 'Different task' }), /belongs to a different task/);
+    approveWrite();
+    await transferReady;
+    assert.equal((await call('diagnose_wait', { id: repair.requestId, timeoutMs: 0 })).stage, 'started');
+    approveTransfer();
+    const completed = await call('diagnose_wait', { id: repair.requestId, timeoutMs: 5000, release: true });
+    assert.equal(completed.state, 'finished');
+    assert.equal(completed.result.status, 'ok');
+    assert.deepEqual(await call('diagnose_start', repair), { id: repair.requestId });
+    assert.equal((await call('diagnose_wait', { id: repair.requestId, timeoutMs: 0 })).outputsAvailable, false);
+    assert.equal((await call('diagnose_wait', { id: randomUUID(), timeoutMs: 0 })).state, 'unknown');
     assert.equal((await run('file.read', { path: config })).outputs.file, 'online\n');
     assert.equal(await readFile(config, 'utf8'), 'online\n');
     assert.equal(pairs, 1);
-    assert.deepEqual(approvals, ['execute', 'send', 'execute', 'send', 'execute', 'send', 'execute', 'send', 'execute', 'send']);
+    assert.deepEqual(approvals, Array.from({ length: 6 }, () => ['execute', 'send']).flat());
     const handle = session;
     assert.equal((await helper('close', { session })).disconnected, true);
     session = undefined;
     assert.equal(await host.ended, 'Diagnostician ended session');
     await assert.rejects(helper('call', { session: handle, tool: 'diagnose_wait', arguments: {} }), /session unavailable/i);
   } finally {
+    approveWrite();
+    approveTransfer();
     if (session) await helper('close', { session }).catch(() => {});
     host.close();
     await relay.close();

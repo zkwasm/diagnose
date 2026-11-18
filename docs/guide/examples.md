@@ -64,6 +64,20 @@ For any example, the **person on site** connects the device to a computer that c
 
 **Verify recovery.** Start it the same way the user normally does and perform one real operation, such as opening its status page or loading a sample record.
 
+## The on-site computer is slow or losing disk space
+
+**What you see.** The machine is slow, CPU usage stays high, or free space is dropping during a diagnostic or maintenance task.
+
+**Prepare on site.** Run the probe on the affected computer. If Activity Monitor or Task Manager shows a process ID, share it. If you know the log path or the volume losing space, share it so the agent can check the right file or disk.
+
+**Ask the agent.**
+
+> Use Diagnose to check the on-site computer's high CPU and dropping free space. Show which processes are busy, what started them, and whether a known log is growing. Keep the checks read-only. If I ask for progress on a running repair, look up the original task.
+
+**Follow the evidence.** With Diagnose 0.8.3 or later on both computers, `system.performance` returns the process snapshot, parents, disk capacity, and a short sample of log growth. macOS and Linux can identify visible regular files attached to the selected process's stdout or stderr. On Windows, provide the suspected log paths for growth sampling. CPU measurements reflect the reported source, including a lifetime average on Linux. Use process and file evidence together before proposing a change.
+
+**Verify recovery.** After an authorized intervention, compare another snapshot. Look for the affected process to exit or use less CPU and for the log to stop growing. Check free space separately if files were removed.
+
 ## Use the diagnosis again
 
 If the same site needs follow-up, [save the pairing](reconnect.md#keep-a-device-paired-for-future-diagnosis). When you return, check which equipment is currently attached and repeat the same verification. If you want to repeat the workflow on another device of the same kind, [record the diagnosis and review a reusable procedure](procedures.md#record-a-device-diagnosis-and-improve-your-procedures).

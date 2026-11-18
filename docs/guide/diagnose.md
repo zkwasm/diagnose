@@ -11,7 +11,7 @@ Use this guide if a person on site has shared a nine-letter invitation. Choose t
 
 ## Use Diagnose as a native agent skill
 
-Install the skill once through your agent's GitHub installation flow. All three agents use the same `skills/connect/` directory in the repository. The helper runs Diagnose 0.8.2 locally on demand with `npx` and needs Node.js 20.10 or later. There is no separate global Diagnose CLI installation for this workflow.
+Install the skill once through your agent's GitHub installation flow. All three agents use the same `skills/connect/` directory in the repository. The helper runs Diagnose 0.8.3 locally on demand with `npx` and needs Node.js 20.10 or later. There is no separate global Diagnose CLI installation for this workflow.
 
 ### Claude Code
 
@@ -63,6 +63,7 @@ The agent uses these operations on the **on-site computer** through the probe. T
 | What you can ask the agent to do | Operation |
 | --- | --- |
 | Report the on-site OS, processor architecture, available shells and tools, and visible serial ports. | `system.inspect` |
+| Find high-CPU processes, their parents, free disk space, and growth of selected log files. | `system.performance` |
 | Find a known log or configuration file, inspect its metadata, and read the relevant contents. | `file.list`, `file.stat`, `file.read` |
 | Capture output from a confirmed serial port at the device's baud rate. | `serial.capture` |
 | Send a documented request to the device over serial and read its reply. | `serial.exchange` |
@@ -72,6 +73,8 @@ The agent uses these operations on the **on-site computer** through the probe. T
 The agent submits one operation with `diagnose_start` or groups related operations with `diagnose_batch`. It uses `diagnose_wait` to get the result and `diagnose_cancel` to request cancellation of work in progress. Cancellation does not undo changes already made. You can describe the check in plain language. The agent selects the operation and waits for any approval the probe requires.
 
 For a quick first check, ask “Use Diagnose to identify the on-site operating system, available shell, and visible serial ports.” `system.inspect` also collects the hostname, user paths, and network interfaces. In review mode, the on-site user reviews the collected report before sending it. A serial port listing gives the agent candidates to confirm with the person on site.
+
+For high CPU or disappearing disk space, ask for [a performance check](examples.md#the-on-site-computer-is-slow-or-losing-disk-space). If you ask for progress on a repair, the agent can check the original task ID and report a pending, finished, or unknown outcome. [Task tracking details](automation.md#track-a-task-without-running-it-again)
 
 The native skill supports temporary pairing and finite operations. For live terminals, file transfers, remembered pairings, or case management, [launch the agent with Diagnose MCP](automation.md#launch-an-agent-with-diagnose-mcp). A [device procedure](procedures.md#start-with-a-device-skill-or-markdown-task) can tell the agent which checks and verification steps to use for a particular model.
 

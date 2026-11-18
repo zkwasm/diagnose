@@ -5,11 +5,15 @@ export const CHUNK_SIZE = 12 * 1024;
 export const MAX_OUTPUT = 10 * 1024 * 1024;
 const path = z.string().min(1).max(4096);
 const common = { id: z.string().uuid(), reason: z.string().min(1).max(1000) };
-export const atomicOperationNames = ['system.inspect', 'file.read', 'file.write', 'file.stat', 'file.list', 'file.mkdir', 'file.remove', 'file.rename', 'file.chmod', 'file.transfer', 'process.run', 'process.script', 'process.open', 'resource.resume', 'net.forward', 'serial.capture', 'serial.exchange'] as const;
-export const batchOperationNames = ['system.inspect', 'file.read', 'file.write', 'file.stat', 'file.list', 'file.mkdir', 'file.remove', 'file.rename', 'file.chmod', 'process.run', 'process.script', 'serial.capture', 'serial.exchange'] as const;
+export const atomicOperationNames = ['system.inspect', 'system.performance', 'file.read', 'file.write', 'file.stat', 'file.list', 'file.mkdir', 'file.remove', 'file.rename', 'file.chmod', 'file.transfer', 'process.run', 'process.script', 'process.open', 'resource.resume', 'net.forward', 'serial.capture', 'serial.exchange'] as const;
+export const batchOperationNames = ['system.inspect', 'system.performance', 'file.read', 'file.write', 'file.stat', 'file.list', 'file.mkdir', 'file.remove', 'file.rename', 'file.chmod', 'process.run', 'process.script', 'serial.capture', 'serial.exchange'] as const;
 const environment = z.record(z.string().regex(/^[A-Za-z_][A-Za-z0-9_]*$/), z.string().max(65536)).optional();
 export const atomicTaskSchema = z.discriminatedUnion('operation', [
   z.object({ ...common, operation: z.literal('system.inspect'), arguments: z.object({}).strict() }).strict(),
+  z.object({ ...common, operation: z.literal('system.performance'), arguments: z.object({
+    limit: z.number().int().min(1).max(8).default(5), pids: z.array(z.number().int().min(1).max(0x7fffffff)).max(8).default([]),
+    diskPath: path.optional(), logPaths: z.array(path).max(8).default([]),
+  }).strict() }).strict(),
   z.object({ ...common, operation: z.literal('file.read'), arguments: z.object({ path, offset: z.number().int().min(0).default(0), length: z.number().int().min(1).max(1024 * 1024).default(65536) }).strict() }).strict(),
   z.object({ ...common, operation: z.literal('file.write'), arguments: z.object({ path, content: z.string().max(1024 * 1024), expectedSha256: z.string().regex(/^[a-f0-9]{64}$/).optional() }).strict() }).strict(),
   z.object({ ...common, operation: z.literal('file.stat'), arguments: z.object({ path }).strict() }).strict(),

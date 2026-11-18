@@ -12,6 +12,7 @@ Pick the closest example. Each one shows what to prepare on site, what to ask th
 | A device on the local network appears offline in an app. | [Check whether the device or its app is offline](docs/guide/examples.md#a-network-device-appears-offline) |
 | A machine is running, but new readings stopped reaching the factory dashboard. | [Trace missing readings through an industrial PC](docs/guide/examples.md#factory-readings-stopped-arriving) |
 | An application on the on-site computer fails after a configuration change. | [Check a failed application startup](docs/guide/examples.md#an-application-wont-start) |
+| The on-site computer is slow or losing disk space. | [Check high CPU and log growth](docs/guide/examples.md#the-on-site-computer-is-slow-or-losing-disk-space) |
 
 ## Choose your setup or workflow
 

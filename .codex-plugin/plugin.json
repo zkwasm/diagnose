@@ -1,6 +1,6 @@
 {
   "name": "diagnose",
   "description": "Troubleshoot remote devices through a user-authorized Diagnose session.",
-  "version": "0.8.2",
+  "version": "0.8.3",
   "skills": "./skills/"
 }

@@ -12,7 +12,7 @@ const loopback = '127.0.0.1';
 const defaultRelay = 'https://diagnose.fenginwind.com';
 const requestMs = 135_000;
 const diagnosticOperations = new Set([
-  'system.inspect', 'file.read', 'file.stat', 'file.list', 'file.write',
+  'system.inspect', 'system.performance', 'file.read', 'file.stat', 'file.list', 'file.write',
   'process.run', 'serial.capture', 'serial.exchange',
 ]);
 const tools = new Set(['diagnose_start', 'diagnose_batch', 'diagnose_wait', 'diagnose_cancel']);

@@ -5,6 +5,7 @@ import { dirname, basename, resolve, join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { isUtf8 } from 'node:buffer';
 import { inspectSystem } from './discover.js';
+import { inspectPerformance } from './performance.js';
 import { SerialPort } from 'serialport';
 import { MAX_OUTPUT, type AtomicTask, type Task, type Result } from './schema.js';
 import { redact, sha256 } from './util.js';
@@ -26,6 +27,7 @@ export async function execute(task: AtomicTask, signal: AbortSignal, write?: Ret
   signal.throwIfAborted();
   switch (task.operation) {
     case 'system.inspect': return { result: { status: 'ok', data: await inspectSystem() }, outputs: [] };
+    case 'system.performance': return { result: { status: 'ok', data: await inspectPerformance(task.arguments, signal) }, outputs: [] };
     case 'file.stat': {
       const stat = await lstat(task.arguments.path);
       return { result: { status: 'ok', data: { size: stat.size, mode: stat.mode & 0o777, modifiedAt: stat.mtime.toISOString(), type: stat.isDirectory() ? 'directory' : stat.isSymbolicLink() ? 'symlink' : stat.isFile() ? 'file' : 'other', ...(stat.isSymbolicLink() ? { target: await readlink(task.arguments.path) } : {}) } }, outputs: [] };

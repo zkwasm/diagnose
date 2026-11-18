@@ -1,6 +1,6 @@
 {
   "name": "@masstensor/diagnose",
-  "version": "0.8.2",
+  "version": "0.8.3",
   "description": "Agent-led remote troubleshooting and problem resolution, with end-to-end encryption and user-controlled permissions",
   "type": "module",
   "license": "MIT",

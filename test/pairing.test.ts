@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { randomUUID } from 'node:crypto';
 import { PairingStore, automatic, RememberedConnection } from '../dist/pairing.js';
 import { createCode } from '../dist/crypto.js';
 import { createRelay } from '../dist/relay.js';
@@ -95,10 +96,14 @@ test('real MCP sessions reuse a saved device; a broken request is not replayed a
   try {
     const task = value(await client.callTool({ name: 'diagnose_start', arguments: { operation: 'system.inspect', arguments: {}, reason: 'Saved device, no code' } })); assert.equal(value(await client.callTool({ name: 'diagnose_wait', arguments: { id: task.id, timeoutMs: 3000 } })).result.status, 'ok');
     await client.close(); await probe.ended; await new Promise(resolve => setTimeout(resolve, 80)); probe = host(); await probe.open(); client = await session();
-    const slow = value(await client.callTool({ name: 'diagnose_start', arguments: { operation: 'process.script', arguments: { interpreter: process.execPath, script: 'setTimeout(()=>{},10000)' }, reason: 'Interrupt without replay' } }));
+    const interrupted = { requestId: randomUUID(), operation: 'process.script', arguments: { interpreter: process.execPath, script: 'setTimeout(()=>{},10000)' }, reason: 'Interrupt without replay' };
+    const slow = value(await client.callTool({ name: 'diagnose_start', arguments: interrupted }));
     probe.close(); await probe.ended; await new Promise(resolve => setTimeout(resolve, 80)); probe = host(); await probe.open();
     const next = value(await client.callTool({ name: 'diagnose_start', arguments: { operation: 'system.inspect', arguments: {}, reason: 'Reconnect for new work only' } })); assert.equal(value(await client.callTool({ name: 'diagnose_wait', arguments: { id: next.id, timeoutMs: 3000 } })).result.status, 'ok');
-    assert.equal(count, 3); const lost = await client.callTool({ name: 'diagnose_wait', arguments: { id: slow.id } }); assert.equal(lost.isError, true);
+    const lost = value(await client.callTool({ name: 'diagnose_wait', arguments: { id: slow.id } }));
+    assert.equal(lost.state, 'unknown');
+    assert.deepEqual(value(await client.callTool({ name: 'diagnose_start', arguments: interrupted })), slow);
+    assert.equal(count, 3);
   } finally { await client.close(); probe.close(); await relay.close(); }
 });
 

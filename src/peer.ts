@@ -52,6 +52,7 @@ export class Peer extends EventEmitter {
   private invitationTimer?: NodeJS.Timeout;
   private attempts = 0;
   private joined = false;
+  supportsPerformance = false;
   fingerprint = '';
   rememberedCode?: string;
 
@@ -124,7 +125,7 @@ export class Peer extends EventEmitter {
       const hello = JSON.parse(this.handshake.receive(bytes).toString());
       if (typeof hello.label !== 'string' || hello.label.length > 120 || hello.role !== (this.options.role === 'host' ? 'operator' : 'probe')) throw new Error('Invalid peer hello');
       if (this.options.role === 'host') {
-        const reply = this.handshake.send(Buffer.from(JSON.stringify({ role: 'probe', label: (this.options.label ?? 'User probe').slice(0, 120) })));
+        const reply = this.handshake.send(Buffer.from(JSON.stringify({ role: 'probe', label: (this.options.label ?? 'User probe').slice(0, 120), performanceInspection: true })));
         this.cipher = this.handshake.split(); this.handshake = undefined; this.fingerprint = this.cipher.fingerprint;
         this.ws.send(reply);
         clearTimeout(this.handshakeTimer);
@@ -145,6 +146,7 @@ export class Peer extends EventEmitter {
           this.activate();
         })().catch(() => this.close('Pairing approval failed'));
       } else {
+        this.supportsPerformance = hello.performanceInspection === true;
         this.cipher = this.handshake.split(); this.handshake = undefined; this.fingerprint = this.cipher.fingerprint;
         this.emit('pairing-progress', 2);
       }

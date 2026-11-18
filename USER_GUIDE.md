@@ -51,9 +51,13 @@ npx @masstensor/diagnose@latest start
 
 If npm asks to install the package, type `y`. In v0.8+, choose the [approval mode](docs/guide/on-site.md#start-the-probe) before sharing the invitation. Press Enter for review, `a` for automatic tasks and results, or `e` to also preapprove the connection. Keep this terminal open and share the nine-letter invitation privately.
 
-### 3. On the diagnostician's computer
+### 3. Choose how to start the diagnosis
 
-For an existing Claude Code, Codex CLI, or Gemini CLI session, install the [native Diagnose skill from GitHub](docs/guide/diagnose.md#use-diagnose-as-a-native-agent-skill) once, then invoke it with the invitation. For a script or an agent session that should start with Diagnose already configured, use the npm launcher:
+#### Manual agent mode (recommended for your first session)
+
+Open the agent you already use and start the diagnosis in chat. You give the agent the invitation, describe the problem, and direct follow-up checks as results come in. A device procedure is optional.
+
+If you [installed the native Diagnose skill](docs/guide/diagnose.md#use-diagnose-as-a-native-agent-skill), invoke `/diagnose:connect` in Claude Code, `$diagnose:connect` in Codex, or ask Gemini to use the `connect` skill. You can also launch an agent with Diagnose already configured by running:
 
 ```sh
 npx @masstensor/diagnose@latest agent codex
@@ -63,6 +67,17 @@ npx @masstensor/diagnose@latest agent codex
 In the agent conversation, provide the code, device model, connection method, and a concrete goal.
 
 > Use Diagnose with invitation abc-def-ghi. An OWON SEG-X3-C gateway is connected to the on-site laptop by USB serial. Plug readings have stopped. Inspect the logs, explain any proposed repair, and check whether readings resume after an authorized change.
+
+#### Start automatically with a device procedure
+
+Use this when you have a Markdown procedure for a device or a recurring problem. Replace `./device.md` with the path to your own file:
+
+```sh
+npx @masstensor/diagnose@latest agent codex --skill ./device.md
+# Or replace codex with claude or gemini.
+```
+
+The agent loads the procedure and starts working through it. If it needs an invitation, share it in the agent conversation. The same on-site permissions apply in both modes. See [how to prepare a device procedure](docs/guide/procedures.md#start-with-a-device-skill-or-markdown-task).
 
 ### 4. Approve, diagnose, and finish
 

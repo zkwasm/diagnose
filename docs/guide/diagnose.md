@@ -4,6 +4,11 @@ Use this guide if a person on site has shared a nine-letter invitation. Choose t
 
 [All guide scenarios](../../USER_GUIDE.md)
 
+## Choose how to start
+
+- **Manual agent mode** is the easiest way to try Diagnose. Use the native skill below, or [launch an agent with Diagnose MCP](automation.md#launch-an-agent-with-diagnose-mcp). Give the agent the invitation and symptom in chat, then guide the investigation as it returns evidence.
+- **Start with a device procedure** when you have steps you want the agent to follow at launch. [Load a Markdown file with `--skill`](procedures.md#start-with-a-device-skill-or-markdown-task). The on-site probe still controls permissions.
+
 ## Use Diagnose as a native agent skill
 
 Install the skill once through your agent's GitHub installation flow. All three agents use the same `skills/connect/` directory in the repository. The helper runs Diagnose 0.8.0 locally on demand with `npx` and needs Node.js 20.10 or later. There is no separate global Diagnose CLI installation for this workflow.

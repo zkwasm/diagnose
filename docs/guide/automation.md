@@ -6,7 +6,7 @@ Use the npm launcher for a configured agent session, or start Diagnose directly 
 
 ## Launch an agent with Diagnose MCP
 
-Choose one:
+To start an interactive session and give the agent its task in chat, choose one:
 
 ```sh
 npx @masstensor/diagnose@latest agent codex
@@ -29,6 +29,8 @@ Then tell the agent what to inspect and provide the pairing code in the agent co
 > Use Diagnose to connect to pairing code abc-def-ghi . Help resolve the user's application startup failure. First investigate without changing anything. Explain the cause, proposed fix, and risks. Apply only authorized changes, then check whether the application starts successfully. Summarize what changed and anything still unresolved.
 
 The code and diagnostic results enter your chosen AI provider's context. The user confirms the connection if their [startup choice](on-site.md#start-the-probe) requires it. Ask the agent to use the `diagnose_*` tools for remote actions: its normal shell and file tools still act on the diagnostician's computer.
+
+To give the agent its task at launch, [pass a device procedure with `--skill`](procedures.md#start-with-a-device-skill-or-markdown-task).
 
 ## Direct CLI and other MCP clients
 

@@ -62,7 +62,7 @@ The agent uses these operations on the **on-site computer** through the probe. T
 
 | What you can ask the agent to do | Operation |
 | --- | --- |
-| Identify the on-site OS and list visible serial ports. | `system.inspect` |
+| Report the on-site OS, processor architecture, available shells and tools, and visible serial ports. | `system.inspect` |
 | Find a known log or configuration file, inspect its metadata, and read the relevant contents. | `file.list`, `file.stat`, `file.read` |
 | Capture output from a confirmed serial port at the device's baud rate. | `serial.capture` |
 | Send a documented request to the device over serial and read its reply. | `serial.exchange` |
@@ -70,6 +70,8 @@ The agent uses these operations on the **on-site computer** through the probe. T
 | Apply an authorized configuration edit to a file on the on-site computer. | `file.write` |
 
 The agent submits one operation with `diagnose_start` or groups related operations with `diagnose_batch`. It uses `diagnose_wait` to get the result and `diagnose_cancel` to request cancellation of work in progress. Cancellation does not undo changes already made. You can describe the check in plain language. The agent selects the operation and waits for any approval the probe requires.
+
+For a quick first check, ask “Use Diagnose to identify the on-site operating system, available shell, and visible serial ports.” `system.inspect` also collects the hostname, user paths, and network interfaces. In review mode, the on-site user reviews the collected report before sending it. A serial port listing gives the agent candidates to confirm with the person on site.
 
 The native skill supports temporary pairing and finite operations. For live terminals, file transfers, remembered pairings, or case management, [launch the agent with Diagnose MCP](automation.md#launch-an-agent-with-diagnose-mcp). A [device procedure](procedures.md#start-with-a-device-skill-or-markdown-task) can tell the agent which checks and verification steps to use for a particular model.
 

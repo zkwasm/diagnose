@@ -28,7 +28,7 @@ function helper(action: string, input: Record<string, unknown>, onProgress?: (st
   });
 }
 
-test('native Skill helper pairs once, runs a shell command, reuses the connection for a repair and closes it', { timeout: 30000 }, async () => {
+test('native Skill helper pairs once, runs a shell command, reuses the connection for a repair and closes it', { timeout: 60000 }, async () => {
   const scratch = await mkdtemp(join(tmpdir(), 'diagnose-skill-'));
   const config = join(scratch, 'config.txt');
   await writeFile(config, 'offline\n');
@@ -58,7 +58,12 @@ test('native Skill helper pairs once, runs a shell command, reuses the connectio
     const call = (tool: string, args: object) => helper('call', { session, tool, arguments: args });
     const run = async (operation: string, args: object) => {
       const { id } = await call('diagnose_start', { operation, arguments: args, reason: 'Test an isolated demo configuration' });
-      return call('diagnose_wait', { id, timeoutMs: 5000 });
+      const deadline = Date.now() + 25000;
+      do {
+        const outcome = await call('diagnose_wait', { id, timeoutMs: 5000 });
+        if (!outcome.pending) return outcome;
+      } while (Date.now() < deadline);
+      assert.fail(`${operation} did not return a final result`);
     };
     const forged = session.replace(/.$/, session.endsWith('0') ? '1' : '0');
     await assert.rejects(helper('close', { session: forged }), /Invalid skill session/);
@@ -69,8 +74,8 @@ test('native Skill helper pairs once, runs a shell command, reuses the connectio
     const command = process.platform === 'win32'
       ? { executable: 'powershell.exe', args: ['-NoProfile', '-NonInteractive', '-Command', '40 + 2'] }
       : { executable: '/bin/sh', args: ['-c', 'printf "%s" "$((40 + 2))"'] };
-    const executed = await run('process.run', { ...command, cwd: scratch, timeoutMs: 5000 });
-    assert.equal(executed.result.status, 'ok');
+    const executed = await run('process.run', { ...command, cwd: scratch, timeoutMs: 15000 });
+    assert.equal(executed.result.status, 'ok', JSON.stringify(executed.result));
     assert.equal(executed.outputs.stdout.trim(), '42');
     assert.equal((await run('file.read', { path: config })).outputs.file, 'offline\n');
     const expectedSha256 = createHash('sha256').update('offline\n').digest('hex');

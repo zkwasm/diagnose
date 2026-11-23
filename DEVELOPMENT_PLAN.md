@@ -67,3 +67,42 @@ The first release deliberately retains explicit pinned revisions, a personal cap
 ## 0.7 invitation usability
 
 Implemented nine-letter invitations with a 30-minute deadline, OPAQUE endpoint authentication, local consent, independent endpoint attempt limits, and unchanged high-entropy remembered credentials. Session idle/lifetime clocks now begin after pairing. Legacy D1 invitations remain accepted. See PAIRING_PROTOCOL.md for the design, entropy accounting and rollout requirements. The previously pending 0.6 features are included in this release; npm 0.6 publication was not completed.
+
+## Field workflow after the Argentina CT meter session
+
+An on-site user should be able to install and open Probe, send one code, then follow simple instructions while the diagnostician's agent runs several rounds of checks through the on-site computer. Field testing reached the OWON gateway through USB. Preparing Node.js, recovering from unstable Wi-Fi and interpreting terminal output took time away from the device investigation.
+
+### 1. Session permissions and useful progress
+
+- **On-site consent.** For a fresh one-time invitation, show automatic approval for the session as the default selection. The user confirms before the invitation appears. Explain that the recipient can connect with the code, run approved session capabilities with the local user's permissions, and receive results. Offer manual review in the same screen. A new invitation or remembered pairing has its own consent.
+- **Switch during review.** Every execution and transfer prompt offers approval once, automatic approval for the rest of the current session, rejection and details. The user can revoke automatic approval or end access from the same screen. Record permission changes and keep the operation and result details in local history.
+- **Readable status.** Both ends show the current step in plain language, for example waiting for approval, capturing gateway logs, sending results, waiting for the on-site user, or reconnecting. Show a short outcome and the next action. Keep commands, technical metadata and raw results on demand. Preserve structured output for CLI and MCP automation.
+- **Acceptance.** A field participant can explain who gains access and when it ends, switch modes during either review stage, and find the record of what ran, what was sent and what changed. Cancelling access ends outstanding work and closes live channels. A short summary identifies a failed action and where to find its details.
+
+### 2. One diagnostic session across network interruptions
+
+- **Session lifetime.** The current two-hour invitation is for first pairing. After pairing, keep the logical session open across several agent turns, tasks and on-site actions. Reset the six-hour idle clock on authenticated user or diagnostician activity. Transport keepalives do not reset it. On-site termination or revocation takes effect immediately, including while offline.
+- **Resume.** On transient transport loss both endpoints retry with bounded backoff. Resume the same logical session with a high-entropy, session-bound credential issued through the authenticated channel, mutually authenticate and use fresh transport keys. Recover after a relay restart or a diagnostician agent restart within the same validity window. Keep the current permission scope. Local Probe exit ends access. Remembered pairing retains its separate enrollment and revocation rules.
+- **Task state.** Use a stable request ID across reconnects. Show whether a task was queued, running, awaiting transfer, completed or has an unknown result. Deliver already-authorized saved results where available. Do not rerun a command or a write when its outcome is uncertain. Recheck state and obtain a new decision before retrying a state-changing operation. Keep an explicit local disconnect distinct from loss of network.
+- **Acceptance.** Pair once, perform three diagnostic rounds, interrupt Wi-Fi before and during a task, restart the relay and restart the diagnostician agent. Each valid resume uses the original session. No task runs twice. Revoked and expired sessions cannot resume. Older clients continue to pair under their current protocol during rollout.
+
+### 3. Independent Probe desktop app
+
+- **Windows first.** Publish a signed installer for supported Windows systems, followed by a signed and notarized macOS build and a Linux package based on field demand. Bundle the runtime and required native modules. The on-site user downloads, installs and opens Probe through the normal OS interface. Include an offline-installable build and an integrity check for downloads. Preserve the existing CLI and npm distribution for automation and technical users.
+- **First screen.** Guide the user through language, connection permission, a visible code with a Copy button, connection status, any physical action requested by support, and an End session button. Run under the user's account. Do not start background access at login by default.
+- **Shared implementation.** Reuse the same transport, task engine, permission decisions and encrypted local audit as the CLI. Separate the on-site UI from the engine behind a narrow local interface. Evaluate installer size, native serial support, signing and update behavior before selecting desktop packaging. Avoid a second protocol or a separate diagnoser product.
+- **Acceptance.** On a clean Windows computer with no Node.js or npm, install offline once the package is downloaded, open it from the Start menu, copy a code, capture from a USB gateway and end access. An interrupted download can be retried without a partial installation. Repeat the launch and native USB tests on each supported platform before publishing its installer.
+
+### 4. Language and device handoffs
+
+- **Languages.** Start with English, Simplified Chinese and Spanish. Use the OS language as the initial selection where supported, let each side change its display language independently, and remember the choice locally. Localize setup, permissions, connection status, errors and on-site instructions from the diagnostician. Raw evidence stays in its original language.
+- **Physical steps.** Support an explicit on-site instruction during the same session. In a USB capture, the user sees when capture is ready and when to restart the gateway. When a serial device disappears, show that Probe is waiting for it to reappear. Let the diagnostician correlate attach events, logs and device identifiers, including different byte orders for the same Zigbee address.
+- **Evidence.** Distinguish a gateway cloud connection, a meter joined to the gateway, and a confirmed meter reading delivered upstream. Report each claim with its own evidence and mark unverified steps.
+- **Acceptance.** On a Spanish-language Windows computer, an on-site user can install without terminal commands, follow a USB restart instruction and end the session. Run the diagnostic side in English during the same session. Verify translated core prompts in all three languages and compare the captured gateway and meter IDs against published device labels.
+
+### Implementation and rollout
+
+1. Simplify manual review prompts and activity output. Add an integration test for viewing details, granting session approval during review and running a second task over the same connection.
+2. Complete the startup permission selection and task status messages. Add authenticated session resume, task recovery and revocation tests before deploying a relay update. Verify mixed versions and intentionally interrupted sessions on Windows and macOS.
+3. Make on-site prompts reusable across the CLI and app. Add the three languages and validate the USB handoff on a real gateway. Build the signed Windows installer against this shared implementation and test it on a clean machine.
+4. Update Quick Start, the landing page and the demonstration after the corresponding workflow ships. Repeat the field scenario with nontechnical users, a Spanish UI and a deliberately unstable connection.

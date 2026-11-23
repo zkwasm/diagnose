@@ -8,11 +8,11 @@ import { createRelay } from '../dist/relay.js';
 import { Peer } from '../dist/peer.js';
 import { Operator } from '../dist/operator.js';
 
-test('actual host CLI displays and enforces pairing, execution and transfer prompts', { skip: process.platform !== 'darwin', timeout: 15000 }, async () => {
+test('host CLI shows details on request and can switch to automatic approval during review', { skip: process.platform !== 'darwin', timeout: 15000 }, async () => {
   const relay = createRelay({ port: 0 }); const url = `ws://127.0.0.1:${await relay.listen()}`;
   // macOS script accepts a POSIX pipe, but not Node's socketpair-backed stdin.
   const child = spawn('/bin/sh', ['-c', 'cat | /usr/bin/script -q /dev/null "$@"', 'diagnose-cli-test', process.execPath, resolve('dist/cli.js'), 'start', url], { detached: true, env: { ...process.env, HOME: mkdtempSync(tmpdir() + '/diagnose-cli-') }, stdio: ['pipe', 'pipe', 'pipe'] });
-  let text = '', startup = false, pairing = false, executing = false, sending = false;
+  let text = '', startup = false, pairing = false, details = false, executing = false, sending = false;
   let stderr = ''; child.stderr.on('data', bytes => { stderr += bytes.toString(); });
   let codeResolve!: (value: string) => void;
   const code = new Promise<string>(resolve => { codeResolve = resolve; });
@@ -20,8 +20,9 @@ test('actual host CLI displays and enforces pairing, execution and transfer prom
     text += bytes.toString(); const match = /\b[a-z]{3}-[a-z]{3}-[a-z]{3}\b/.exec(text); if (match) codeResolve(match[0]);
     if (!startup && text.includes('Task approval for the next session?')) { startup = true; child.stdin.write('\n'); }
     if (!pairing && text.includes('Allow this temporary diagnostic session?')) { pairing = true; child.stdin.write('y\n'); }
-    if (!executing && text.includes('Allow exactly this operation?')) { executing = true; child.stdin.write('y\n'); }
-    if (!sending && text.includes('Send these results (')) { sending = true; child.stdin.write('y\n'); }
+    if (!details && text.includes('Allow exactly this operation?')) { details = true; child.stdin.write('d\n'); }
+    if (!executing && text.includes('SHA256:')) { executing = true; child.stdin.write('y\n'); }
+    if (!sending && text.includes('Send these results (')) { sending = true; child.stdin.write('a\n'); }
   });
   const timer = setTimeout(() => child.kill('SIGKILL'), 12000);
   let peer: Peer | undefined;
@@ -29,7 +30,14 @@ test('actual host CLI displays and enforces pairing, execution and transfer prom
     const pairCode = await Promise.race([code, new Promise<never>((_, reject) => child.once('exit', () => reject(new Error('CLI exited before registration: ' + stderr))))]);
     peer = new Peer({ role: 'join', code: pairCode, relay: url }); const operator = new Operator(peer); await peer.open();
     const result = await operator.run({ operation: 'system.inspect', arguments: {}, reason: 'Verify terminal approvals' });
-    assert.equal(result.result.status, 'ok'); assert.ok(startup && pairing && executing && sending); assert.ok(text.includes('TRANSFER APPROVAL'));
+    assert.equal(result.result.status, 'ok'); assert.ok(startup && pairing && details && executing && sending);
+    assert.match(text, /Automatically run tasks and send results for the rest of this session/);
+    assert.match(text, /Automatic approval enabled for this session/);
+    const next = await operator.run({ operation: 'system.inspect', arguments: {}, reason: 'Run another task in the same session' });
+    assert.equal(next.result.status, 'ok');
+    assert.equal(text.split('Allow exactly this operation?').length - 1, 2, 'Only the original prompt and its repeat after viewing details should appear');
+    assert.equal(text.split('Send these results (').length - 1, 1);
+    assert.equal(text.split('SHA256:').length - 1, 1, 'Automatic tasks should keep previews out of the console');
   } finally { clearTimeout(timer); peer?.close(); child.stdin.end('\x03'); if (child.pid) { try { process.kill(-child.pid, 'SIGTERM'); } catch {} } await relay.close(); }
 });
 

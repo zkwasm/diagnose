@@ -94,7 +94,7 @@ export class ProbeEngine {
     this.audit.history.event(request.task.id, 'approval-preview', { stage: request.stage, digest: request.digest, preview: request.preview });
     if (this.mode === 'auto') {
       this.audit.record('task.auto-approved', { id: request.task.id, stage: request.stage, digest: request.digest, ...(request.bytes === undefined ? {} : { bytes: request.bytes }) });
-      this.notice(`[AUTO ${request.stage}] ${request.task.operation} ${request.task.id}\n${safeText(request.preview.slice(0, 8192))}${request.preview.length > 8192 ? '\n[Terminal preview truncated; task digest and byte counts are audited.]' : ''}`);
+      this.notice(`[AUTO ${request.stage}] ${request.task.operation}`);
       return true;
     }
     return aborted(this.approve(request), request.signal!);
@@ -109,7 +109,6 @@ export class ProbeEngine {
   private async runAtomic(task: AtomicTask, signal: AbortSignal, write: ReturnType<typeof prepareWrite>, parentId?: string): Promise<Execution> {
     signal.throwIfAborted();
     this.audit.record('task.executing', { id: task.id, ...(parentId ? { parentId } : {}) });
-    this.notice(`Executing ${task.operation} ${task.id}`);
     const execution: Execution = resourceOperation(task.operation) ? { result: { status: 'ok', data: await this.resources.open(task, this.owner, signal) }, outputs: [] } : await execute(task, signal, write);
     if (execution.outputs.some(item => item.truncated)) execution.result.truncated = true;
     if (task.operation === 'file.write' && execution.result.status === 'ok') this.audit.record('task.file-changed', { id: task.id, ...(parentId ? { parentId } : {}), ...(execution.result.data as Record<string, unknown>) });

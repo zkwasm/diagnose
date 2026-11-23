@@ -8,7 +8,7 @@ import { Operator } from './operator.js';
 import { Audit, safeText } from './util.js';
 import { serveMcp } from './mcp.js';
 import type { TaskInput } from './schema.js';
-import { SessionResources } from './resources.js';
+import { SessionResources, resourceOperation } from './resources.js';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { upload, download, type TransferOptions } from './transfers.js';
@@ -67,14 +67,6 @@ async function main(): Promise<void> {
   const stop = () => { shutdown.abort(); peer?.close('User ended session'); void resources?.revoke().catch(() => {}); rl.close(); };
   rl.on('SIGINT', stop); process.once('SIGINT', stop); process.once('SIGTERM', stop);
   rl.once('close', () => { shutdown.abort(); peer?.close('User terminal closed'); });
-  const ask = async (text: string, signal = shutdown.signal, taskApproval = false): Promise<boolean> => {
-    while (true) {
-      let answer: string; promptActive = true; try { answer = (await rl.question(safeText(text) + ' [y/N] ', { signal })).trim(); } finally { promptActive = false; }
-      if (!localCommand(answer)) return answer.toLowerCase() === 'y';
-      signal.throwIfAborted();
-      if (taskApproval && engine?.permissionMode === 'auto') return true;
-    }
-  };
   try {
     if (command === 'start') {
       const store = new PairingStore();
@@ -122,13 +114,46 @@ async function main(): Promise<void> {
         audit.record('session.pairing-decision', { allowed, fingerprint }); return allowed;
       } });
       engine = new ProbeEngine(peer, async request => {
-        console.log(`\n[${request.stage === 'execute' ? 'EXECUTION APPROVAL' : 'TRANSFER APPROVAL'}] ${request.task.operation}\nTask: ${request.task.id}\nSHA256: ${request.digest}\n${safeText(request.preview)}\n`);
-        return ask(request.stage === 'execute' ? 'Allow exactly this operation? Commands run with your OS permissions.' : `Send these results (${request.bytes ?? 0} output bytes plus metadata)?`, request.signal, true);
+        const reason = safeText(request.task.reason).replace(/\s+/g, ' ').slice(0, 160);
+        console.log(`\n${request.stage === 'execute' ? 'Task' : 'Results'}: ${request.task.operation}${reason ? `\nDiagnostician’s reason: ${reason}` : ''}`);
+        const signal = request.signal ?? shutdown.signal;
+        const continuous = request.stage === 'send' && resourceOperation(request.task.operation);
+        const question = request.stage === 'execute' ? 'Allow exactly this operation? Commands run with your OS permissions.'
+          : continuous ? 'Allow ongoing input and output for this connection? Traffic is sent without redaction or further review.'
+            : `Send these results (${request.bytes ?? 0} output bytes plus metadata)?`;
+        const steps = request.task.operation === 'batch.run' ? request.task.arguments.steps : [request.task];
+        if (request.stage === 'execute' && steps.some(step => step.operation.startsWith('serial.'))) console.log('Serial control lines may reset the device.');
+        console.log('Automatically run tasks and send results for the rest of this session with option a. Tasks use your permissions and raw channels may include sensitive data.');
+        while (true) {
+          let answer: string;
+          promptActive = true;
+          try { answer = (await rl.question(question + ' [y=once / a=automatic / d=details / Enter=reject] ', { signal })).trim(); }
+          finally { promptActive = false; }
+          signal.throwIfAborted();
+          switch (answer.toLowerCase()) {
+            case 'y': return true;
+            case 'a':
+              audit.record('permissions.session-granted', { task: request.task.id, stage: request.stage });
+              engine!.setPermissionMode('auto');
+              console.log('Automatic approval enabled for this session. Type "permissions ask" to turn it off.');
+              return true;
+            case 'd':
+              console.log(`Task: ${request.task.id}\nSHA256: ${request.digest}\n${safeText(request.preview)}`);
+              break;
+            default:
+              if (!localCommand(answer)) return false;
+              signal.throwIfAborted();
+              if (engine!.permissionMode === 'auto') return true;
+          }
+        }
       }, audit, message => console.log(safeText(message)), { resources, idleMs: remembered ? 0 : idleMinutes * 60000, lifetimeMs: remembered ? 0 : sessionMinutes * 60000 });
       const scheduleGrant = () => { clearTimeout(grantTimer); if (remembered && automatic(remembered)) { engine!.setPermissionMode('auto'); if (remembered.autoUntil !== null) grantTimer = setTimeout(() => { remembered!.autoUntil = 0; store.save(remembered!); engine!.setPermissionMode('ask'); }, Math.max(1, remembered.autoUntil - Date.now())); } };
       scheduleGrant();
       let active = false, autoRequestedAt = 0;
-      peer.on('active', () => { active = true; console.log(`Session permissions: ${engine!.permissionMode}. Local commands: pairing, pause, resume, unpair, permissions, permissions auto [forever], permissions ask, jobs, recover <id>, secret <id>, cancel, exit.`); });
+      peer.on('active', () => {
+        active = true;
+        console.log(`Connected. ${engine!.permissionMode === 'auto' ? 'Tasks and result transfers are automatically approved.' : 'You will review tasks and result transfers.'} Press Ctrl+C to end the session.`);
+      });
       localCommand = value => {
         if (['pairing', 'pause', 'resume', 'unpair'].includes(value)) {
           if (value === 'pairing') { console.log(remembered ? `Paired with: ${safeText(remembered.label)} (${remembered.id}); ${remembered.paused ? 'paused' : 'available'}; auto: ${automatic(remembered) ? remembered.autoUntil === null ? 'until revoked' : new Date(remembered.autoUntil).toISOString() : 'off'}` : 'No remembered diagnostician'); return true; }

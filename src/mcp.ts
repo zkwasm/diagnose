@@ -13,7 +13,7 @@ import { digest, safeText } from './util.js';
 import { registerKnowledge } from './knowledge-mcp.js';
 
 export async function serveMcp(relay: string, device?: string, caseId?: string): Promise<void> {
-  const server = new McpServer({ name: 'diagnose', version: '0.8.3' });
+  const server = new McpServer({ name: 'diagnose', version: '0.8.4' });
   let operator: Operator | undefined;
   let remembered = device ? new RememberedConnection(new PairingStore().get(device, 'operator')) : undefined;
   const transfers = new Map<string, { progress: TransferProgress; controller: AbortController }>(), forwards = new Map<string, Forward>();

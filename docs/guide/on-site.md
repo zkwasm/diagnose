@@ -94,7 +94,7 @@ With v0.8+, a probe starting a new pairing asks which approval mode to use befor
 
 Share an **Approve everything** invitation only with the intended diagnostician. Type `permissions ask` to cancel that choice before pairing or revoke auto approval after pairing. The next invitation does not inherit it. Requests to remember a diagnostician still require confirmation.
 
-With v0.7+, the terminal shows a **nine-letter invitation**, such as `abc-def-ghi`, and the audit log path. Keep it open. Share the code privately by message or read it aloud. It lasts **30 minutes** and is consumed by successful pairing. Case, spaces and hyphens do not matter when entering it. Treat the code as a secret; do not post it publicly or put it in shell arguments. After expiry or five attempted handshakes, the running probe generates a new code.
+With v0.7+, the terminal shows a **nine-letter invitation**, such as `abc-def-ghi`, and the audit log path. Keep it open. Share the code privately by message or read it aloud. With a 0.8.4+ probe and relay, it lasts **two hours** and is consumed by successful pairing. Case, spaces and hyphens do not matter when entering it. Treat the code as a secret; do not post it publicly or put it in shell arguments. After expiry or five attempted handshakes, the running probe generates a new code.
 
 The probe will show the connecting party's self-reported label and the session fingerprint. Check these with the intended diagnostician before accepting. A code proves possession of the secret, not a person's identity.
 

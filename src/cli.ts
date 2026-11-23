@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { createInterface } from 'node:readline/promises';
 import { stdin, stdout } from 'node:process';
-import { createCode, createInvitation } from './crypto.js';
+import { createCode, createInvitation, INVITATION_MS } from './crypto.js';
 import { Peer } from './peer.js';
 import { ProbeEngine } from './engine.js';
 import { Operator } from './operator.js';
@@ -168,7 +168,7 @@ async function main(): Promise<void> {
       rl.on('line', onLocalLine);
       try {
         await peer.open();
-        console.log(remembered ? `Remembered diagnostician: ${safeText(remembered.label)}. Waiting for connections. Local commands: pairing, pause, resume, unpair, permissions ask, permissions auto [forever], cancel, jobs, exit. Audit: ${audit.path}` : `Relay: ${relay}\nAudit: ${audit.path}\nPairing code (30 minutes, one-time, share privately):\n${code}\nCtrl+C ends the session and cancels active tasks.`);
+        console.log(remembered ? `Remembered diagnostician: ${safeText(remembered.label)}. Waiting for connections. Local commands: pairing, pause, resume, unpair, permissions ask, permissions auto [forever], cancel, jobs, exit. Audit: ${audit.path}` : `Relay: ${relay}\nAudit: ${audit.path}\nPairing code (${INVITATION_MS / 3600000} hours, one-time, share privately):\n${code}\nCtrl+C ends the session and cancels active tasks.`);
         console.log(`Session ended: ${safeText(await peer.ended)}`);
         if (nextSessionApproval === 'everything') nextSessionApproval = 'review';
       } catch (error) { const collision = (error as Error).message.includes('Invitation locator occupied'); if (!shutdown.signal.aborted) console.log(collision ? 'Choosing another invitation code...' : `Relay unavailable: ${safeText((error as Error).message)}. Retained work remains local; retrying in 3 seconds.`); await delay(collision ? 100 : 3000, undefined, { signal: shutdown.signal }).catch(() => {}); }

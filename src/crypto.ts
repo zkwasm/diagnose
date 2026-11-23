@@ -3,7 +3,7 @@ import Noise from 'noise-handshake';
 import Cipher from 'noise-handshake/cipher.js';
 
 export const NOISE_PROTOCOL = 'Noise_NNpsk0_25519_ChaChaPoly_BLAKE2b';
-export const INVITATION_MS = 30 * 60 * 1000;
+export const INVITATION_MS = 2 * 60 * 60 * 1000;
 export function createInvitation(): string {
   const letters = Array.from({ length: 9 }, () => String.fromCharCode(97 + randomInt(26))).join('');
   return letters.match(/.{3}/g)!.join('-');

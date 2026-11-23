@@ -151,7 +151,7 @@ SOCKS defaults to `allowedHosts:["*"]`, which permits any target. Narrow it when
 
 | Limit | Default / maximum |
 | --- | --- |
-| New short invitation | 30 minutes; one-time; up to five attempted handshakes |
+| New short invitation | Two hours with probe and relay 0.8.4+; one-time; up to five attempted handshakes |
 | Temporary session idle / total | Six hours idle / no fixed total by default in v0.8+ |
 | Remembered pairing | Until revoked locally; requires the foreground probe |
 | Remembered automatic grant | 1 hour, or until locally revoked if explicitly chosen |
@@ -173,7 +173,7 @@ Temporary-session activity includes task requests, result polls, and live resour
 
 ## Short invitation compatibility
 
-Nine-letter invitations require **0.7.0+ on both computers** and an updated relay. The latest client also accepts legacy `D1` codes from older probes. Existing remembered pairings keep working without a new code. The 30-minute invitation deadline is separate from diagnostic session idle/total timeouts, which begin after pairing. Knowledge-library recovery files remain long private credentials; do not shorten them or use them as pairing codes.
+Nine-letter invitations require **0.7.0+ on both computers** and an updated relay. The latest client also accepts legacy `D1` codes from older probes. Existing remembered pairings keep working without a new code. The invitation deadline is separate from diagnostic session idle/total timeouts, which begin after pairing. Knowledge-library recovery files remain long private credentials; do not shorten them or use them as pairing codes.
 
 ## Session configuration and extra arguments
 

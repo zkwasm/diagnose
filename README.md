@@ -20,7 +20,7 @@ In v0.8+, press Enter to review tasks and results, choose `a` to approve tasks a
 
 ### Manual agent mode (recommended for a first session)
 
-Install once from this GitHub repository. The native Skill uses Diagnose 0.8.3 and starts the local runtime on demand through Node.js and npm.
+Install once from this GitHub repository. The native Skill uses Diagnose 0.8.4 and starts the local runtime on demand through Node.js and npm.
 
 | Agent | Install | Use |
 | --- | --- | --- |
@@ -51,7 +51,7 @@ Pass a Markdown skill for the device or recurring fault when launching the agent
 npx @masstensor/diagnose@latest agent codex --skill ./device.md
 ```
 
-Short invitations require **0.7.0+ on both endpoints** and a compatible relay. They last 30 minutes and are consumed by successful pairing. The site user authorizes pairing at the prompt or in advance by choosing **Approve everything**. Existing remembered pairings remain valid. See the [protocol design](PAIRING_PROTOCOL.md).
+Short invitations require **0.7.0+ on both endpoints** and a compatible relay. With a 0.8.4+ on-site probe and relay, they last two hours and are consumed by successful pairing. The site user authorizes pairing at the prompt or in advance by choosing **Approve everything**. Existing remembered pairings remain valid. See the [protocol design](PAIRING_PROTOCOL.md).
 
 For a custom automation client, run `diagnose mcp` as a stdio subprocess. See the [native setup](docs/guide/diagnose.md#use-diagnose-as-a-native-agent-skill) and [automation setup](docs/guide/automation.md#direct-cli-and-other-mcp-clients) for the two entry points.
 

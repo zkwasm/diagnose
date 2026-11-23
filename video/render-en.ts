@@ -55,7 +55,7 @@ function draw(index: number, time: number) {
       command('$ npx @masstensor/diagnose@latest start', 140, 463, local, .5, 32);
       enter(local, 1.6, () => text('Selected: a · Auto tasks only', 140, 532, 29, C.white));
       enter(local, 2.6, () => {
-        text('One-time invitation · 30 minutes', 140, 604, 26, C.dim);
+        text('One-time invitation · Two hours', 140, 604, 26, C.dim);
         box(140, 632, 1040, 100, '#2f4432', 12);
         text('abc-def-ghi', 167, 695, 42, C.lime, 600, true);
         pill(local > 5.1 ? 'COPIED' : 'COPY CODE', 955, 660, 182, true);

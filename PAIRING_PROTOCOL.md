@@ -2,7 +2,7 @@
 
 ## User experience
 
-New invitations are nine uniformly random English letters, displayed as `abc-def-ghi`. Input ignores case, whitespace and hyphens. They expire after 30 minutes, including time spent awaiting local confirmation. Successful pairing consumes the invitation. Declining, reaching the attempt limit, or ending the probe also invalidates it. A running probe generates a new invitation when the old one ends.
+New invitations are nine uniformly random English letters, displayed as `abc-def-ghi`. Input ignores case, whitespace and hyphens. Starting in 0.8.4, the probe and relay expire them after two hours, including time spent awaiting local confirmation. Successful pairing consumes the invitation. Declining, reaching the attempt limit, or ending the probe also invalidates it. A running probe generates a new invitation when the old one ends.
 
 Remembered pairing still exchanges an independent 256-bit random `D1` credential inside the approved encrypted session. It is stored privately and is not spoken or manually entered. Existing remembered credentials work unchanged. Knowledge-library `K1` recovery credentials are unrelated and unchanged.
 
@@ -12,7 +12,7 @@ The first two letters form a public locator: relay room `S2.ab`. The remaining s
 
 The complete code, password, or a publicly testable hash of them is never sent to the relay. Publishing a hash of all nine letters as the routing identifier would create an offline password-checking oracle and is deliberately avoided.
 
-The probe enforces at most five attempted handshakes per invitation, even if the relay ignores its own limits. The relay also enforces five attempts, 30-minute expiry, concurrent connection limits and 60 new connections per IP per minute. Wrong passwords cannot reach the local approval prompt. These limits bound online guessing; they cannot guarantee availability against a malicious relay. A holder of the complete code can request access, but still needs local user approval. A supplied name is not verified identity.
+The probe enforces at most five attempted handshakes per invitation, even if the relay ignores its own limits. The relay also enforces five attempts, two-hour expiry, concurrent connection limits and 60 new connections per IP per minute. Wrong passwords cannot reach the local approval prompt. These limits bound online guessing; they cannot guarantee availability against a malicious relay. A holder of the complete code can request access, but still needs local user approval. A supplied name is not verified identity.
 
 ## Cryptographic flow
 

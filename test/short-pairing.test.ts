@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
 import { WebSocketServer, WebSocket } from 'ws';
-import { createInvitation, parseInvitation, createCode, parseCode } from '../dist/crypto.js';
+import { createInvitation, parseInvitation, createCode, parseCode, INVITATION_MS } from '../dist/crypto.js';
 import { InvitationHost, InvitationJoin } from '../dist/short-pairing.js';
 import { createRelay } from '../dist/relay.js';
 import { Peer } from '../dist/peer.js';
@@ -60,6 +60,35 @@ test('relay rejects an expired invitation before its periodic cleanup', { timeou
   const host = new Peer({ role: 'host', code, relay: url }); await host.open(); await wait(60);
   const join = new Peer({ role: 'join', code, relay: url });
   try { await assert.rejects(join.open()); } finally { join.close(); host.close(); await relay.close(); }
+});
+
+test('default short invitations pair after 30 minutes and expire at two hours', { timeout: 10000 }, async t => {
+  assert.equal(INVITATION_MS, 120 * 60_000);
+  const start = Date.now();
+  let now = start;
+  t.mock.method(Date, 'now', () => now);
+  const relay = createRelay({ port: 0 });
+  const url = 'ws://127.0.0.1:' + await relay.listen();
+  const first = new Peer({ role: 'host', code: 'abc-def-ghi', relay: url, accept: async () => true });
+  const second = new Peer({ role: 'host', code: 'xyz-abc-def', relay: url, accept: async () => true });
+  let joiner: Peer | undefined;
+  let expired: Peer | undefined;
+  try {
+    await first.open();
+    await second.open();
+    now = start + 31 * 60_000;
+    joiner = new Peer({ role: 'join', code: 'abc-def-ghi', relay: url });
+    await joiner.open();
+    now = start + 120 * 60_000;
+    expired = new Peer({ role: 'join', code: 'xyz-abc-def', relay: url });
+    await assert.rejects(expired.open());
+  } finally {
+    joiner?.close();
+    expired?.close();
+    first.close();
+    second.close();
+    await relay.close();
+  }
 });
 
 test('probe limits attempts even if a malicious relay keeps resetting the handshake', { timeout: 10000 }, async () => {

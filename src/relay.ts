@@ -68,7 +68,7 @@ export function createRelay(options: RelayOptions = {}) {
             state.role = 'host'; state.room = msg.room; control(ws, 'registered');
           } else {
             const room = rooms.get(msg.room);
-            if (!room || room.locked || room.peer || room.attempts >= (room.short ? 5 : 10) || room.expires < Date.now()) throw new Error();
+            if (!room || room.locked || room.peer || room.attempts >= (room.short ? 5 : 10) || room.expires <= Date.now()) throw new Error();
             state.role = 'join'; state.room = msg.room; room.peer = ws; room.attempts++;
             control(room.host, 'peer'); control(ws, 'joined');
           }

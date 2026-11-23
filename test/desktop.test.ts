@@ -38,8 +38,22 @@ test('desktop bridge localizes consent and ends a diagnostic session on window c
     peer = new Peer({ role: 'join', code: invitation.code!, relay: url });
     await peer.open();
     assert.match((await until('connected')).text, /Conexión establecida/);
-    const result = await new Operator(peer).run({ operation: 'system.inspect', arguments: {}, reason: 'Read probe inventory' });
+    const operator = new Operator(peer);
+    const result = await operator.run({ operation: 'system.inspect', arguments: {}, reason: 'Read probe inventory' });
     assert.equal(result.result.status, 'ok');
+    if (process.env.DIAGNOSE_TEST_NODE && process.platform !== 'win32') {
+      const terminal = await operator.run({ operation: 'process.open', arguments: { executable: '/bin/sh', args: ['-c', 'printf "PACKAGED_%s\\n" PTY'], pty: true }, reason: 'Verify the bundled native terminal' });
+      assert.equal(terminal.result.status, 'ok', terminal.result.error);
+      const { id } = terminal.result.data as { id: string };
+      let cursor = 0, output = '';
+      for (let round = 0; round < 60 && !output.includes('PACKAGED_PTY'); round++) {
+        const read = await operator.resource({ id, action: 'read', cursor }) as { cursor: number; records: { data: string }[] };
+        cursor = read.cursor;
+        for (const record of read.records) output += Buffer.from(record.data, 'base64').toString();
+        if (!output.includes('PACKAGED_PTY')) await new Promise(resolve => setTimeout(resolve, 20));
+      }
+      assert.match(output, /PACKAGED_PTY/);
+    }
     const exited = once(child, 'exit');
     child.stdin.end();
     assert.equal(await peer.ended, 'User ended session');

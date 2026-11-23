@@ -25,7 +25,7 @@ Version: $version
 Section: utils
 Priority: optional
 Architecture: $arch
-Maintainer: Diagnose <support@fenginwind.com>
+Maintainer: Diagnose contributors
 Depends: libc6 (>= 2.34), libstdc++6, libgtk-3-0t64 | libgtk-3-0, libjson-glib-1.0-0
 Homepage: https://diagnose.fenginwind.com
 Description: On-site desktop probe for remote device diagnostics

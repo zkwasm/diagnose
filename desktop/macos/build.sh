@@ -14,6 +14,11 @@ app="$work/image/Diagnose Probe.app"
 runtime="$app/Contents/Resources/runtime"
 mkdir -p "$app/Contents/MacOS"
 node "$root/desktop/stage.mjs" "$runtime"
+if [ "$(lipo -archs "$runtime/node")" != "$swift_arch" ]; then
+    lipo -thin "$swift_arch" "$runtime/node" -output "$work/node"
+    mv "$work/node" "$runtime/node"
+    chmod 755 "$runtime/node"
+fi
 cat > "$app/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "https://www.apple.com/DTDs/PropertyList-1.0.dtd">

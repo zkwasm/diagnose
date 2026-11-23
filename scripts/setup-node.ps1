@@ -32,7 +32,12 @@ if (Get-Command node -ErrorAction SilentlyContinue) {
         $archive = Join-Path $stage 'node.zip'
         $release = [regex]::Match($filename, '^node-(v22\.[0-9]+\.[0-9]+)-').Groups[1].Value
         Write-Host "Downloading $filename from nodejs.org..."
-        Invoke-WebRequest -UseBasicParsing -Uri ('https://nodejs.org/dist/' + $release + '/' + $filename) -OutFile $archive
+        for ($attempt = 1; $attempt -le 3; $attempt++) {
+            & curl.exe --fail --silent --show-error --location --connect-timeout 15 --max-time 120 --output $archive ('https://nodejs.org/dist/' + $release + '/' + $filename)
+            if ($LASTEXITCODE -eq 0) { break }
+            if ($attempt -lt 3) { Start-Sleep -Seconds 2 }
+        }
+        if ($LASTEXITCODE -ne 0) { throw 'Could not download Node.js from nodejs.org. Nothing was installed. Try another network or the official Windows installer at https://nodejs.org/en/download.' }
         if ((Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant() -ne $match.Groups[1].Value) { throw 'Checksum mismatch. Nothing was installed. Run setup again.' }
         Write-Host 'Checksum verified. Installing into your private .diagnose\node directory...'
         Expand-Archive -LiteralPath $archive -DestinationPath $stage

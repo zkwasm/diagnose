@@ -33,9 +33,10 @@ try {
     } finally { Pop-Location }
     $csc = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
     $launcher = Join-Path $stage 'Diagnose Probe.exe'
-    & $csc /nologo /target:winexe /codepage:65001 /reference:System.Windows.Forms.dll /reference:System.Drawing.dll /reference:System.Web.Extensions.dll "/out:$launcher" (Join-Path $PSScriptRoot 'Probe.cs')
+    $icon = Join-Path $root 'desktop\icons\diagnose-probe.ico'
+    & $csc /nologo /target:winexe /codepage:65001 /reference:System.Windows.Forms.dll /reference:System.Drawing.dll /reference:System.Web.Extensions.dll "/win32icon:$icon" "/out:$launcher" (Join-Path $PSScriptRoot 'Probe.cs')
     if ($LASTEXITCODE) { throw 'Could not compile the Windows launcher.' }
-    $options = @("/DStage=$stage", "/DVersion=$($metadata.version)", "/O$Output")
+    $options = @("/DStage=$stage", "/DVersion=$($metadata.version)", "/DProbeIcon=$icon", "/O$Output")
     if ($SignCommand) {
         & $env:ComSpec /d /c ($SignCommand.Replace('$f', '"' + $launcher + '"'))
         if ($LASTEXITCODE) { throw 'Could not sign the Windows launcher.' }

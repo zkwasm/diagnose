@@ -15,7 +15,7 @@ work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 package="$work/package"
 app="$package/opt/diagnose-probe"
-mkdir -p "$app" "$package/DEBIAN" "$package/usr/share/applications" "$package/usr/share/icons/hicolor/scalable/apps"
+mkdir -p "$app" "$package/DEBIAN" "$package/usr/share/applications" "$package/usr/share/icons/hicolor/512x512/apps"
 node "$root/desktop/stage.mjs" "$app/runtime"
 cc -std=c11 -O2 -Wall -Wextra -Wno-unused-parameter "$here/probe.c" -o "$app/diagnose-probe" $(pkg-config --cflags --libs gtk+-3.0 json-glib-1.0)
 "$app/diagnose-probe" --check-runtime
@@ -41,7 +41,7 @@ Icon=diagnose-probe
 Terminal=false
 Categories=Utility;
 DESKTOP
-cp "$root/site/icon.svg" "$package/usr/share/icons/hicolor/scalable/apps/diagnose-probe.svg"
+cp "$root/desktop/icons/diagnose-probe.png" "$package/usr/share/icons/hicolor/512x512/apps/diagnose-probe.png"
 name="diagnose-probe-${version}_${arch}.deb"
 dpkg-deb --root-owner-group --build "$package" "$output/$name"
 (cd "$output" && sha256sum "$name" > "$name.sha256")

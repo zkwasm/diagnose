@@ -216,6 +216,7 @@ static void activate(GtkApplication *app, Probe *probe) {
     if (probe->window) { gtk_window_present(GTK_WINDOW(probe->window)); return; }
     probe->window = gtk_application_window_new(app);
     gtk_window_set_title(GTK_WINDOW(probe->window), "Diagnose Probe");
+    gtk_window_set_icon_name(GTK_WINDOW(probe->window), "diagnose-probe");
     gtk_window_set_default_size(GTK_WINDOW(probe->window), 760, 440);
     gtk_container_set_border_width(GTK_CONTAINER(probe->window), 18);
     GtkWidget *panel = gtk_box_new(GTK_ORIENTATION_VERTICAL, 14);

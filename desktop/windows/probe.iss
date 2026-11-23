@@ -13,6 +13,7 @@ OutputBaseFilename=Diagnose-Probe-Windows-x64
 Compression=lzma2
 SolidCompression=yes
 UninstallDisplayIcon={app}\Diagnose Probe.exe
+SetupIconFile={#ProbeIcon}
 #ifdef SignProbe
 SignTool=DiagnoseSign
 SignedUninstaller=yes

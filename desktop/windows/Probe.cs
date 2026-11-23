@@ -29,6 +29,7 @@ internal sealed class Probe : Form {
 
     private Probe() {
         Text = "Diagnose Probe";
+        Icon = System.Drawing.Icon.ExtractAssociatedIcon(Application.ExecutablePath);
         Font = new Font("Segoe UI", 11);
         ClientSize = new Size(760, 460);
         MinimumSize = new Size(620, 400);

@@ -73,7 +73,14 @@ export async function launchAgent(argv: string[]): Promise<number> {
       await writeFile(path, JSON.stringify({ ...settings, mcpServers: { ...(settings.mcpServers as object ?? {}), diagnose: server } }), { mode: 0o600 });
       env.GEMINI_CLI_HOME = directory; args = extra;
     }
-    if (prompt) args = agent === 'gemini' ? [...args, '--include-directories', taskDirectory!, '--prompt-interactive', prompt] : [...args, '--add-dir', taskDirectory!, '--', prompt];
+    if (prompt) {
+      if (agent === 'gemini') args.push('--include-directories', taskDirectory!, '--prompt-interactive', prompt);
+      else {
+        // Codex only needs to read the snapshot. --add-dir requests write access.
+        if (agent === 'claude') args.push('--add-dir', taskDirectory!);
+        args.push('--', prompt);
+      }
+    }
     const command = await agentCommand(agent, args, env);
     return await new Promise<number>((resolveExit, reject) => {
       const child = spawn(command.command, command.args, { env, stdio: 'inherit', shell: false });

@@ -68,8 +68,11 @@ for (const agent of ['codex', 'claude', 'gemini']) test(`agent ${agent} loads th
   assert.equal(result.code, 0, result.output); const captured = JSON.parse(readFileSync(f.capture, 'utf8'));
   assert.deepEqual(captured.server.args.slice(-2), ['--device', 'alice-pc']); assert.match(captured.args.at(-1), /do not ask for a pairing code/);
   assert.equal(captured.task.instructions, body); assert.equal(captured.task.sourceFile, source); assert.equal(captured.task.baseDirectory, f.root); assert.equal(captured.taskMode, 0o600); assert.equal(existsSync(captured.taskPath), false); assert.ok(captured.tools.includes('diagnose_pair'));
-  const scopeFlag = agent === 'gemini' ? '--include-directories' : '--add-dir';
-  assert.equal(captured.args[captured.args.indexOf(scopeFlag) + 1], dirname(captured.taskPath));
+  if (agent === 'codex') assert.ok(!captured.args.includes('--add-dir'));
+  else {
+    const scopeFlag = agent === 'gemini' ? '--include-directories' : '--add-dir';
+    assert.equal(captured.args[captured.args.indexOf(scopeFlag) + 1], dirname(captured.taskPath));
+  }
   assert.notEqual(dirname(captured.taskPath), f.root);
   if (captured.settingsPath) assert.ok(!captured.settingsPath.startsWith(dirname(captured.taskPath) + '/'));
   assert.ok(!captured.args.join(' ').includes('PRIVATE_TASK_MARKER')); assert.ok(!result.output.includes('PRIVATE_TASK_MARKER')); assert.ok(captured.args.includes('selected-model'));

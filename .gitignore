@@ -10,3 +10,5 @@ test/live-*.ts
 video/audio-en/
 video/output/
 windows-installer/
+macos-installer/
+linux-installer/

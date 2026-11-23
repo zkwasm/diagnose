@@ -12,6 +12,14 @@ The Windows x64 preview bundles the runtime and serial support. It installs for 
 
 The unsigned installer from [GitHub Actions](https://github.com/zkwasm/diagnose/actions/workflows/test.yml) is a test build. A public download still needs signing and a clean Windows test with a physical USB device.
 
+## macOS and Linux desktop previews
+
+For macOS 13 or later, use the DMG that matches your processor, Apple Silicon or Intel. Open the image and drag **Diagnose Probe** into Applications. The CI previews are for development. Public downloads require Apple Developer ID signing and notarization.
+
+On Ubuntu 22.04 or later or Debian 12 or later, install the matching `.deb` and open **Diagnose Probe** from the applications menu. The package includes the Probe runtime. Linux uses the machine's normal access rules for USB serial ports.
+
+Both apps use **Start support**, **Copy code** and **End access**. Preview builds with checksums are attached to the [desktop packages workflow](https://github.com/zkwasm/diagnose/actions/workflows/desktop-packages.yml) after successful builds.
+
 ## First-time setup: install Node.js and npm
 
 If you are the person receiving help, this is the only software setup you need. You do **not** need a Codex, Claude, Gemini, or npm account. Your diagnostician runs the AI on their own computer.

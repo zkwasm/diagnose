@@ -1,0 +1,28 @@
+{
+  "en": {
+    "ready": "Start when your support contact is ready.",
+    "starting": "Starting Diagnose Probe…",
+    "failed": "Could not start Diagnose Probe.",
+    "start": "Start support", "end": "End access", "copy": "Copy code", "revoke": "Require review",
+    "code": "Pairing code", "activity": "Session activity",
+    "everything": "Approve everything", "review": "Review", "confirm": "Confirm connection only",
+    "allow": "Allow", "allowReview": "Allow with review", "allowAuto": "Allow automatically",
+    "once": "Approve once", "session": "Approve for this session", "details": "View details", "reject": "Reject"
+  },
+  "zh": {
+    "ready": "诊断人员准备好后，点击开始。", "starting": "正在启动 Diagnose Probe…", "failed": "无法启动 Diagnose Probe。",
+    "start": "开始诊断", "end": "结束访问", "copy": "复制配对码", "revoke": "恢复逐项审核",
+    "code": "配对码", "activity": "会话记录",
+    "everything": "全部授权", "review": "逐项审核", "confirm": "只确认连接",
+    "allow": "允许", "allowReview": "允许并逐项审核", "allowAuto": "允许并自动授权",
+    "once": "仅批准这一次", "session": "本次会话自动授权", "details": "查看详情", "reject": "拒绝"
+  },
+  "es": {
+    "ready": "Empezá cuando soporte esté listo.", "starting": "Iniciando Diagnose Probe…", "failed": "No se pudo iniciar Diagnose Probe.",
+    "start": "Iniciar soporte", "end": "Terminar acceso", "copy": "Copiar código", "revoke": "Volver a revisar",
+    "code": "Código de conexión", "activity": "Actividad de la sesión",
+    "everything": "Aprobar todo", "review": "Revisar", "confirm": "Confirmar conexión",
+    "allow": "Permitir", "allowReview": "Permitir con revisión", "allowAuto": "Permitir automáticamente",
+    "once": "Aprobar una vez", "session": "Aprobar durante esta sesión", "details": "Ver detalles", "reject": "Rechazar"
+  }
+}

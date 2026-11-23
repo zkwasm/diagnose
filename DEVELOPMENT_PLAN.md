@@ -72,7 +72,7 @@ Implemented nine-letter invitations with a 30-minute deadline, OPAQUE endpoint a
 
 An on-site user should be able to install and open Probe, send one code, then follow simple instructions while the diagnostician's agent runs several rounds of checks through the on-site computer. Field testing reached the OWON gateway through USB. Preparing Node.js, recovering from unstable Wi-Fi and interpreting terminal output took time away from the device investigation.
 
-The 0.8.5 implementation covers approval selection and switching, readable task states, temporary resume, case-based agent restart, serial readiness and read-only USB reattachment. Core probe controls support English, Simplified Chinese and Spanish. The Windows x64 desktop app has an offline-installer build and a CI smoke test. Public Windows distribution requires signing and an on-site USB acceptance run. Equivalent desktop packages for macOS and Linux are separate platform work.
+The 0.8.5 implementation covers approval selection and switching, readable task states, temporary resume, case-based agent restart, serial readiness and read-only USB reattachment. Core probe controls support English, Simplified Chinese and Spanish. Windows has an offline-installer preview. macOS and Linux have desktop package build and smoke-test workflows. Public desktop distribution requires platform-specific signing where applicable and an on-site USB acceptance run.
 
 ### 1. Session permissions and useful progress
 

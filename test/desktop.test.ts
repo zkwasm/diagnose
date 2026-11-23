@@ -13,7 +13,7 @@ import { Operator } from '../dist/operator.js';
 test('desktop bridge localizes consent and ends a diagnostic session on window close', { timeout: 15000 }, async () => {
   const root = await mkdtemp(join(tmpdir(), 'diagnose-desktop-'));
   const relay = createRelay({ port: 0 }), url = `ws://127.0.0.1:${await relay.listen()}`;
-  const child = spawn(process.execPath, ['dist/cli.js', 'start', url, '--desktop-stdio', '--lang', 'es'], {
+  const child = spawn(process.env.DIAGNOSE_TEST_NODE ?? process.execPath, [process.env.DIAGNOSE_TEST_CLI ?? 'dist/cli.js', 'start', url, '--desktop-stdio', '--lang', 'es'], {
     env: { ...process.env, HOME: root, USERPROFILE: root },
     stdio: ['pipe', 'pipe', 'pipe'],
   });

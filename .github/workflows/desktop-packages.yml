@@ -1,0 +1,58 @@
+name: macOS and Linux desktop packages
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  package:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: macos-15, platform: macos, arch: arm64 }
+          - { os: macos-15-intel, platform: macos, arch: x64 }
+          - { os: ubuntu-22.04, platform: linux, arch: amd64 }
+          - { os: ubuntu-22.04-arm, platform: linux, arch: arm64 }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: npm-shrinkwrap.json
+      - run: npm ci
+      - if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libjson-glib-dev xvfb xauth desktop-file-utils
+      - name: Build installer
+        run: sh desktop/${{ matrix.platform }}/build.sh "$RUNNER_TEMP/probe-package"
+      - name: Test installed macOS bundle
+        if: runner.os == 'macOS'
+        run: |
+          archive=$(find "$RUNNER_TEMP/probe-package" -name '*.dmg' -print -quit)
+          mount_dir=$(mktemp -d "$RUNNER_TEMP/probe-volume.XXXXXX")
+          hdiutil attach -readonly -nobrowse -mountpoint "$mount_dir" "$archive"
+          app="$RUNNER_TEMP/Diagnose Probe.app"
+          ditto "$mount_dir/Diagnose Probe.app" "$app"
+          hdiutil detach "$mount_dir"
+          codesign --verify --deep --strict "$app"
+          "$app/Contents/MacOS/Diagnose Probe" --check-runtime
+          DIAGNOSE_TEST_NODE="$app/Contents/Resources/runtime/node" \
+          DIAGNOSE_TEST_CLI="$app/Contents/Resources/runtime/dist/cli.js" \
+            node --experimental-strip-types --test test/desktop.test.ts
+      - name: Test installed Debian package
+        if: runner.os == 'Linux'
+        run: |
+          archive=$(find "$RUNNER_TEMP/probe-package" -name '*.deb' -print -quit)
+          sudo apt-get install -y "$archive"
+          desktop-file-validate /usr/share/applications/com.fenginwind.diagnose.probe.desktop
+          /opt/diagnose-probe/diagnose-probe --check-runtime
+          xvfb-run -a sh -c 'timeout 3 /opt/diagnose-probe/diagnose-probe || test "$?" -eq 124'
+          DIAGNOSE_TEST_NODE=/opt/diagnose-probe/runtime/node \
+          DIAGNOSE_TEST_CLI=/opt/diagnose-probe/runtime/dist/cli.js \
+            node --experimental-strip-types --test test/desktop.test.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: diagnose-probe-${{ matrix.platform }}-${{ matrix.arch }}-test-build
+          path: ${{ runner.temp }}/probe-package

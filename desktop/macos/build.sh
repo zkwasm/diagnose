@@ -19,6 +19,8 @@ if [ "$(lipo -archs "$runtime/node")" != "$swift_arch" ]; then
     mv "$work/node" "$runtime/node"
     chmod 755 "$runtime/node"
 fi
+# Keep external symbols used by native Node add-ons, and discard debug/local symbols.
+xcrun strip -S -x "$runtime/node"
 cat > "$app/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "https://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -40,13 +42,14 @@ if [ -n "${MACOS_SIGN_IDENTITY:-}" ]; then
     codesign --force --options runtime --timestamp --entitlements "$here/node-entitlements.plist" --sign "$MACOS_SIGN_IDENTITY" "$runtime/node"
     codesign --force --options runtime --timestamp --sign "$MACOS_SIGN_IDENTITY" "$app"
 else
+    codesign --force --sign - "$runtime/node"
     codesign --force --sign - "$app"
 fi
 codesign --verify --deep --strict "$app"
 "$app/Contents/MacOS/Diagnose Probe" --check-runtime
 ln -s /Applications "$work/image/Applications"
 name="Diagnose-Probe-$version-macOS-$arch.dmg"
-hdiutil create -fs HFS+ -format UDZO -volname "Diagnose Probe" -srcfolder "$work/image" -ov "$output/$name"
+hdiutil create -fs HFS+ -format ULMO -volname "Diagnose Probe" -srcfolder "$work/image" -ov "$output/$name"
 if [ -n "${MACOS_SIGN_IDENTITY:-}" ]; then
     codesign --force --timestamp --sign "$MACOS_SIGN_IDENTITY" "$output/$name"
 fi

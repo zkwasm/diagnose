@@ -1,9 +1,9 @@
 import { randomUUID } from 'node:crypto';
 import { Peer } from './peer.js';
-import { MAX_OUTPUT, taskSchema, resourceRequestSchema, type TaskInput, type ResourceRequest, type Result, type WireMessage } from './schema.js';
+import { MAX_OUTPUT, taskSchema, resourceRequestSchema, type TaskInput, type ResourceRequest, type Result, type TaskPhase, type WireMessage } from './schema.js';
 
 export type Outcome = { id: string; result: Result; outputs: Record<string, string> };
-type Pending = { id: string; pending: true; stage: 'awaiting-start' | 'started' };
+type Pending = { id: string; pending: true; stage: 'awaiting-start' | 'started' | TaskPhase };
 export class Operator {
   observe?: (kind: string, data: unknown, taskId?: string) => void;
   private observed(kind: string, data: unknown, taskId?: string): void {
@@ -12,7 +12,7 @@ export class Operator {
   private retainedBytes = 0;
   private sequence = 0;
   private calls = new Map<string, { resolve: (value: unknown) => void; reject: (error: Error) => void; timer: NodeJS.Timeout }>();
-  private jobs = new Map<string, { promise: Promise<Outcome>; resolve: (value: Outcome) => void; reject: (error: Error) => void; chunks: Record<string, Buffer[]>; bytes: number; index: number; complete: boolean; started: boolean }>();
+  private jobs = new Map<string, { promise: Promise<Outcome>; resolve: (value: Outcome) => void; reject: (error: Error) => void; chunks: Record<string, Buffer[]>; bytes: number; index: number; complete: boolean; stage: Pending['stage'] }>();
   constructor(readonly peer: Peer) {
     peer.on('closed', () => { this.observed('connection.closed', { warning: 'Interrupted modifications are not replayed. Inspect state before retrying.' }); for (const job of this.jobs.values()) job.reject(new Error('Session closed')); for (const call of this.calls.values()) { clearTimeout(call.timer); call.reject(new Error('Connection closed; inspect resource state before retrying input or modifications')); } this.calls.clear(); });
     peer.on('message', (message: WireMessage) => {
@@ -20,7 +20,9 @@ export class Operator {
       if (!('id' in message)) return;
       const job = this.jobs.get(message.id); if (!job) return;
       if (message.type === 'task.started') {
-        job.started = true;
+        job.stage = 'started';
+      } else if (message.type === 'task.progress') {
+        job.stage = message.phase;
       } else if (message.type === 'task.output') {
         const bytes = Buffer.from(message.chunk, 'base64');
         this.retainedBytes += bytes.length;
@@ -45,11 +47,15 @@ export class Operator {
     if (!this.peer.supportsPerformance && steps.some(step => step.operation === 'system.performance')) {
       throw new Error('The on-site probe does not support system.performance. Update it before requesting this operation.');
     }
+    if (steps.some(step => (step.operation === 'serial.capture' || step.operation === 'serial.exchange') && step.arguments.reattach
+      && (!this.peer.supportsSerialReattach || step.operation !== 'serial.capture'))) {
+      throw new Error('USB reattachment requires a supported on-site probe and a read-only serial.capture task.');
+    }
     if (this.jobs.has(id)) throw new Error('This task ID is already in use');
     this.observed('task.request', task, task.id);
     let resolve!: (value: Outcome) => void, reject!: (error: Error) => void;
     const promise = new Promise<Outcome>((a, b) => { resolve = a; reject = b; }); promise.catch(() => {});
-    this.jobs.set(task.id, { promise, resolve, reject, chunks: {}, bytes: 0, index: 0, complete: false, started: false });
+    this.jobs.set(task.id, { promise, resolve, reject, chunks: {}, bytes: 0, index: 0, complete: false, stage: 'awaiting-start' });
     try { await this.peer.send({ type: 'task.request', task, sequence: ++this.sequence }); } catch (error) { this.jobs.delete(task.id); reject(error as Error); throw error; }
     return task.id;
   }
@@ -58,7 +64,7 @@ export class Operator {
     // Polling a real task is diagnostic activity even though the result is cached locally.
     void this.peer.send({ type: 'ping', activity: true }).catch(() => {});
     let timer: NodeJS.Timeout | undefined;
-    try { return await Promise.race([job.promise, new Promise<Pending>(resolve => { timer = setTimeout(() => resolve({ id, pending: true, stage: job.started ? 'started' : 'awaiting-start' }), timeoutMs); })]); }
+    try { return await Promise.race([job.promise, new Promise<Pending>(resolve => { timer = setTimeout(() => resolve({ id, pending: true, stage: job.stage }), timeoutMs); })]); }
     finally { clearTimeout(timer); }
   }
   async run(input: TaskInput): Promise<Outcome> { const id = await this.start(input); return this.jobs.get(id)!.promise; }

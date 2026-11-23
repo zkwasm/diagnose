@@ -6,7 +6,7 @@ import { safeText } from './util.js';
 import { InvitationHost, InvitationJoin } from './short-pairing.js';
 import { LEGACY_RELAY_MAX_MS } from './session-limits.js';
 
-export type PeerOptions = { role: 'host' | 'join'; code: string; relay: string; label?: string; remember?: boolean; provision?: () => string | undefined; accept?: (peer: { label: string; fingerprint: string; signal: AbortSignal; remember: boolean }) => Promise<boolean>; approvalTimeoutMs?: number; sessionMs?: number; invitationMs?: number };
+export type PeerOptions = { role: 'host' | 'join'; code: string; relay: string; label?: string; remember?: boolean; provision?: () => string | undefined; resume?: boolean; provisionResume?: () => string; accept?: (peer: { label: string; fingerprint: string; signal: AbortSignal; remember: boolean }) => Promise<boolean>; approvalTimeoutMs?: number; sessionMs?: number; invitationMs?: number };
 export const pairingProgress = [
   'Connected to the relay. Verifying the on-site probe.',
   'Authenticated the on-site probe. Waiting for it to accept the connection. Approve on site if prompted.',
@@ -53,8 +53,12 @@ export class Peer extends EventEmitter {
   private attempts = 0;
   private joined = false;
   supportsPerformance = false;
+  supportsSerialReattach = false;
+  supportsTaskProgress = false;
   fingerprint = '';
   rememberedCode?: string;
+  resumeCode?: string;
+  remoteEnded = false;
 
   constructor(private options: PeerOptions) {
     super();
@@ -111,7 +115,7 @@ export class Peer extends EventEmitter {
   }
   private startNoise(secret: Buffer): void {
     this.handshake = new Handshake(true, this.room, secret);
-    this.ws.send(this.handshake.send(Buffer.from(JSON.stringify({ role: 'operator', label: (this.options.label ?? 'Diagnostic operator').slice(0, 120), ...(this.options.remember ? { remember: true } : {}) }))));
+    this.ws.send(this.handshake.send(Buffer.from(JSON.stringify({ role: 'operator', label: (this.options.label ?? 'Diagnostic operator').slice(0, 120), taskProgress: true, ...(this.options.remember ? { remember: true } : this.options.resume ? { resume: true } : {}) }))));
   }
   private receive(bytes: Buffer): void {
     if (this.pakeStage) {
@@ -125,7 +129,8 @@ export class Peer extends EventEmitter {
       const hello = JSON.parse(this.handshake.receive(bytes).toString());
       if (typeof hello.label !== 'string' || hello.label.length > 120 || hello.role !== (this.options.role === 'host' ? 'operator' : 'probe')) throw new Error('Invalid peer hello');
       if (this.options.role === 'host') {
-        const reply = this.handshake.send(Buffer.from(JSON.stringify({ role: 'probe', label: (this.options.label ?? 'User probe').slice(0, 120), performanceInspection: true })));
+        this.supportsTaskProgress = hello.taskProgress === true;
+        const reply = this.handshake.send(Buffer.from(JSON.stringify({ role: 'probe', label: (this.options.label ?? 'User probe').slice(0, 120), performanceInspection: true, serialReattach: true })));
         this.cipher = this.handshake.split(); this.handshake = undefined; this.fingerprint = this.cipher.fingerprint;
         this.ws.send(reply);
         clearTimeout(this.handshakeTimer);
@@ -142,11 +147,14 @@ export class Peer extends EventEmitter {
             ? { type: 'lock', ttlMs: this.options.sessionMs }
             : { type: 'lock', sliding: true, ttlMs: LEGACY_RELAY_MAX_MS }));
           this.approved = true;
-          await this.send({ type: 'session.accepted', label: safeText(this.options.label ?? 'User probe'), fingerprint: this.fingerprint, ...(hello.remember === true && this.options.provision?.() ? { credential: this.options.provision!() } : {}) });
+          const credential = hello.remember === true ? this.options.provision?.() : undefined;
+          const resume = hello.resume === true && hello.remember !== true ? this.options.provisionResume?.() : undefined;
+          await this.send({ type: 'session.accepted', label: safeText(this.options.label ?? 'User probe'), fingerprint: this.fingerprint, credential, resume });
           this.activate();
         })().catch(() => this.close('Pairing approval failed'));
       } else {
         this.supportsPerformance = hello.performanceInspection === true;
+        this.supportsSerialReattach = hello.serialReattach === true;
         this.cipher = this.handshake.split(); this.handshake = undefined; this.fingerprint = this.cipher.fingerprint;
         this.emit('pairing-progress', 2);
       }
@@ -159,10 +167,11 @@ export class Peer extends EventEmitter {
     if (frame[0] === 0) return;
     const message = parseMessage(JSON.parse(Buffer.concat(this.parts).toString())); this.parts = []; this.partialSize = 0;
     this.lastSeen = Date.now();
-    if (message.type === 'session.closed') { this.close(message.reason); return; }
+    if (message.type === 'session.closed') { this.remoteEnded = true; this.close(message.reason); return; }
     if (message.type === 'session.accepted' && this.options.role === 'join' && !this.approved) {
       if (message.fingerprint !== this.fingerprint) throw new Error('Channel binding mismatch');
       if (message.credential) { if (!this.options.remember) throw new Error('Unexpected pairing credential'); parseCode(message.credential); this.rememberedCode = message.credential; }
+      if (message.resume) { if (!this.options.resume) throw new Error('Unexpected session credential'); parseCode(message.resume); this.resumeCode = message.resume; }
       clearTimeout(this.handshakeTimer); this.approved = true; this.activate(); return;
     }
     if (!this.approved) throw new Error('Not authorized');
@@ -195,7 +204,7 @@ export class Peer extends EventEmitter {
         // Bound sustained traffic below the relay's shared per-room frame budget.
         await new Promise(resolve => setTimeout(resolve, 10));
       }
-      if (message.type.startsWith('task.') || message.type.startsWith('resource.')) this.emit('activity');
+      if (message.type.startsWith('task.') || message.type.startsWith('resource.') || (message.type === 'ping' && message.activity)) this.emit('activity');
     }).finally(() => { this.queuedBytes -= payload.length; });
     this.queue = operation.catch(() => this.close('Encrypted transport failed'));
     return operation;

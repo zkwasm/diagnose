@@ -14,7 +14,7 @@ For any example, the **person on site** connects the device to a computer that c
 
 > The OWON gateway stopped reporting plug readings. It is connected to the on-site Mac by USB. Identify the serial interface, then take a short passive log sample if the port and settings are confirmed. Tell me separately whether the probe is connected, which device interface you can identify, and whether the gateway produced recognizable output.
 
-**Follow the evidence.** If the computer lists two USB serial ports, the person on site can identify the right cable or provide the port name before the agent opens either one. If the capture returns zero bytes, check the documented baud rate and when the gateway normally emits logs. Arrange a second sample during a normal reporting event. If the gateway logs show fresh readings but the dashboard stays stale, check the application that consumes those readings next.
+**Follow the evidence.** If the computer lists two USB serial ports, identify the right cable before opening a port. If the capture returns zero bytes, check the documented baud rate and when the gateway normally emits logs. For an agreed restart, wait until the probe says the serial capture is ready. Compare the meter's full Zigbee EUI-64 in the join or reading log with its label. Some firmware logs the eight bytes in reverse order, so compare both byte orders. A successful gateway connection to the vendor cloud confirms the gateway connection. Look for a fresh reading from the intended meter and independently check the destination.
 
 > The gateway normally reports once a minute. Once we've confirmed the port settings, sample across one reporting interval and tell me whether you see a new reading.
 

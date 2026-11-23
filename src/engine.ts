@@ -1,6 +1,6 @@
 import { Peer } from './peer.js';
-import { execute, prepareWrite, type Execution } from './executor.js';
-import { CHUNK_SIZE, MAX_OUTPUT, type Approval, type ApprovalHandler, type AtomicTask, type BatchTask, type Result, type Task, type WireMessage } from './schema.js';
+import { execute, prepareWrite, type Execution, type SerialState } from './executor.js';
+import { CHUNK_SIZE, MAX_OUTPUT, type Approval, type ApprovalHandler, type AtomicTask, type BatchTask, type Result, type Task, type TaskPhase, type WireMessage } from './schema.js';
 import { Audit, digest, redact, safeText } from './util.js';
 import { SessionResources, resourceOperation } from './resources.js';
 import { randomUUID } from 'node:crypto';
@@ -8,6 +8,7 @@ import { dirname, join, basename } from 'node:path';
 import { DEFAULT_IDLE_MS } from './session-limits.js';
 
 export type PermissionMode = 'ask' | 'auto';
+type TaskNotice = { stage: 'execute' | 'send'; task: Task };
 function aborted<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
   return new Promise((resolve, reject) => {
     const cancel = (): void => reject(new Error('Task cancelled'));
@@ -44,7 +45,7 @@ export class ProbeEngine {
     for (const [id, controller] of this.jobs) { this.audit.record('task.cancel-requested', { id, source: 'local' }); controller.abort(); }
     void this.resources.revoke(this.owner).catch(() => this.peer.close('Resource cleanup failed'));
   }
-  constructor(private peer: Peer, private approve: ApprovalHandler, readonly audit: Audit, private notice: (message: string) => void = () => {}, options: { resources?: SessionResources; idleMs?: number; lifetimeMs?: number } = {}) {
+  constructor(private peer: Peer, private approve: ApprovalHandler, readonly audit: Audit, private notice: (message: string, activity?: TaskNotice) => void = () => {}, private options: { resources?: SessionResources; idleMs?: number; lifetimeMs?: number; sessionTasks?: Set<string>; serialState?: (state: SerialState) => void } = {}) {
     this.resources = options.resources ?? new SessionResources(join(dirname(audit.path), basename(audit.path) + '.resources'), audit);
     this.resources.setAudit(audit);
     const idleMs = options.idleMs ?? DEFAULT_IDLE_MS;
@@ -76,6 +77,11 @@ export class ProbeEngine {
         if (this.seen.size >= 1000) { void this.reply(task.id, { status: 'error', error: 'Legacy client task limit: reconnect and update both endpoints to 0.5.0+. This request was not executed.' }); return; }
         this.seen.add(task.id);
       }
+      if (options.sessionTasks) {
+        if (options.sessionTasks.has(task.id)) { void this.reply(task.id, { status: 'duplicate' }); return; }
+        if (options.sessionTasks.size >= 16384) { void this.reply(task.id, { status: 'error', error: 'Session task limit reached; request was not executed' }); return; }
+        options.sessionTasks.add(task.id);
+      }
       if (this.jobs.has(task.id)) { void this.reply(task.id, { status: 'duplicate' }); return; }
       if (this.jobs.size >= 4) { void this.reply(task.id, { status: 'error', error: 'Four tasks are active; wait for completion before submitting new work' }); return; }
       const controller = new AbortController(); this.jobs.set(task.id, controller);
@@ -84,6 +90,9 @@ export class ProbeEngine {
     peer.on('closed', (reason?: string) => { this.ended = true; clearTimeout(this.idle); clearTimeout(this.lifetime); for (const controller of this.jobs.values()) controller.abort(); void this.resources.disconnect(this.owner).catch(() => {}); try { audit.record('session.closed', { reason: reason && redact(reason) }); } catch { /* Session is already closed. */ } });
   }
   private async reply(id: string, result: Result): Promise<void> { await this.peer.send({ type: 'task.result', id, result }).catch(() => {}); }
+  private progress(id: string, phase: TaskPhase): void {
+    if (this.peer.supportsTaskProgress) void this.peer.send({ type: 'task.progress', id, phase }).catch(() => {});
+  }
   private async finish(id: string, result: Result): Promise<void> { this.jobs.delete(id); await this.reply(id, result); }
   private permission(request: Approval): Promise<boolean> {
     const result = this.approvalQueue.then(() => this.decidePermission(request));
@@ -94,9 +103,10 @@ export class ProbeEngine {
     this.audit.history.event(request.task.id, 'approval-preview', { stage: request.stage, digest: request.digest, preview: request.preview });
     if (this.mode === 'auto') {
       this.audit.record('task.auto-approved', { id: request.task.id, stage: request.stage, digest: request.digest, ...(request.bytes === undefined ? {} : { bytes: request.bytes }) });
-      this.notice(`[AUTO ${request.stage}] ${request.task.operation}`);
+      this.notice(`[AUTO ${request.stage}] ${request.task.operation}`, { stage: request.stage, task: request.task });
       return true;
     }
+    this.progress(request.task.id, request.stage === 'execute' ? 'awaiting-execution-approval' : 'awaiting-transfer-approval');
     return aborted(this.approve(request), request.signal!);
   }
   private recordRequest(task: AtomicTask, parentId?: string): void {
@@ -109,7 +119,11 @@ export class ProbeEngine {
   private async runAtomic(task: AtomicTask, signal: AbortSignal, write: ReturnType<typeof prepareWrite>, parentId?: string): Promise<Execution> {
     signal.throwIfAborted();
     this.audit.record('task.executing', { id: task.id, ...(parentId ? { parentId } : {}) });
-    const execution: Execution = resourceOperation(task.operation) ? { result: { status: 'ok', data: await this.resources.open(task, this.owner, signal) }, outputs: [] } : await execute(task, signal, write);
+    this.progress(parentId ?? task.id, 'running');
+    const execution: Execution = resourceOperation(task.operation) ? { result: { status: 'ok', data: await this.resources.open(task, this.owner, signal) }, outputs: [] } : await execute(task, signal, write, state => {
+      this.options.serialState?.(state);
+      this.progress(parentId ?? task.id, state);
+    });
     if (execution.outputs.some(item => item.truncated)) execution.result.truncated = true;
     if (task.operation === 'file.write' && execution.result.status === 'ok') this.audit.record('task.file-changed', { id: task.id, ...(parentId ? { parentId } : {}), ...(execution.result.data as Record<string, unknown>) });
     if (['file.mkdir', 'file.remove', 'file.rename', 'file.chmod'].includes(task.operation) && execution.result.status === 'ok') this.audit.record('task.filesystem-changed', { id: task.id, operation: task.operation, ...(parentId ? { parentId } : {}), ...task.arguments });
@@ -179,6 +193,7 @@ export class ProbeEngine {
       const outputPreview = execution.outputs.map(item => `[${item.stream}/${item.encoding}; ${item.bytes.length} bytes]\n${item.encoding === 'utf8' ? item.bytes.toString('utf8') : `BINARY: no automatic redaction. Preview shows first 256 bytes; approval sends all ${item.bytes.length} bytes.\n${item.bytes.subarray(0, 256).toString('hex')}`}`).join('\n');
       if (!continuous && !await this.permission({ stage: 'send', task, digest: hash, preview: JSON.stringify(execution.result) + '\n' + outputPreview, bytes: count, signal })) { this.audit.record('task.send-denied', { id: task.id }); await this.finish(task.id, { status: 'denied', error: 'Collected locally; user declined transfer' }); return; }
       signal.throwIfAborted(); this.audit.record('task.transfer-approved', { id: task.id, bytes: count, mode: this.mode });
+      this.progress(task.id, 'sending-results');
       await this.transfer(task.id, execution, signal);
       this.audit.record('task.completed', { id: task.id, status: execution.result.status });
     } catch (error) {

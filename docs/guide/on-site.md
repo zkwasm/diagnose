@@ -6,6 +6,12 @@ If Node.js, npm, and npx are already installed, go straight to [Start the probe]
 
 [All guide scenarios](../../USER_GUIDE.md)
 
+## Windows desktop preview
+
+The Windows x64 preview bundles the runtime and serial support. It installs for your Windows account and opens from the Start menu as **Diagnose Probe**. Pick a language, select **Start support**, review the permission choices and copy the one-time code. Keep the app open while the diagnostician works. Select **Require review** to revoke automatic approval or **End access** to stop the session.
+
+The unsigned installer from [GitHub Actions](https://github.com/zkwasm/diagnose/actions/workflows/test.yml) is a test build. A public download still needs signing and a clean Windows test with a physical USB device.
+
 ## First-time setup: install Node.js and npm
 
 If you are the person receiving help, this is the only software setup you need. You do **not** need a Codex, Claude, Gemini, or npm account. Your diagnostician runs the AI on their own computer.
@@ -84,17 +90,19 @@ npm install -g @masstensor/diagnose@latest
 diagnose start
 ```
 
-With v0.8+, a probe starting a new pairing asks which approval mode to use before displaying its invitation.
+The probe asks which approval mode to use before displaying the first invitation. Starting with v0.8.5, the choices are:
 
 | Startup choice | What it allows |
 | --- | --- |
-| Enter | Confirm the connection and review each task and result transfer. |
+| Enter · Approve everything | Let the person with this one-time invitation connect, run tasks and receive results automatically. |
+| `r` · Review | Confirm the connection and review each task and result transfer. |
 | `a` · Auto tasks only | Confirm the connection once. Tasks and result transfers then proceed automatically. |
-| `e` · Approve everything | Let the holder of this one-time invitation connect automatically, run tasks, and receive results for the temporary session. |
 
 Share an **Approve everything** invitation only with the intended diagnostician. Type `permissions ask` to cancel that choice before pairing or revoke auto approval after pairing. The next invitation does not inherit it. Requests to remember a diagnostician still require confirmation.
 
-With v0.7+, the terminal shows a **nine-letter invitation**, such as `abc-def-ghi`, and the audit log path. Keep it open. Share the code privately by message or read it aloud. With a 0.8.4+ probe and relay, it lasts **two hours** and is consumed by successful pairing. Case, spaces and hyphens do not matter when entering it. Treat the code as a secret; do not post it publicly or put it in shell arguments. After expiry or five attempted handshakes, the running probe generates a new code.
+The terminal shows a **nine-letter invitation**, such as `abc-def-ghi`. Keep it open. Share the code privately by message or read it aloud. With a 0.8.4+ probe and relay, it lasts **two hours** and is consumed by successful pairing. Case, spaces and hyphens do not matter when entering it. Treat the code as a secret and keep it out of shell arguments. After expiry or five attempted handshakes, the running probe generates a new code.
+
+On 0.8.5+, the probe uses the computer's display language when supported. Run `diagnose start --lang es`, `--lang zh`, or `--lang en` to choose Spanish, Simplified Chinese, or English. Leave the probe open if Wi-Fi drops. The diagnostician can reconnect to the same temporary session when both use 0.8.5 or later.
 
 The probe will show the connecting party's self-reported label and the session fingerprint. Check these with the intended diagnostician before accepting. A code proves possession of the secret, not a person's identity.
 
@@ -111,6 +119,8 @@ The connection prompt depends on the startup choice. With per-task review select
 If you chose **Auto tasks only** at startup, press `y` at the connection prompt to confirm automatic mode, or `r` to connect and review each task and its results.
 
 In manual mode, a batch has one execution approval and one combined result approval, rather than one prompt per step. Complete scripts are approved as a whole, not line by line.
+
+At either review prompt, press `y` to approve once, `a` to automatically approve execution and result transmission for the rest of this session, or `d` to see the full details. Press Enter to decline. Run `permissions ask` to switch back to review.
 
 Opening a live process, file transfer, or network tunnel asks for permission to its **continuing raw input/output before the resource is created**. Once granted, input, reads, resizing, signals, and connections within that handle's scope do not prompt again.
 

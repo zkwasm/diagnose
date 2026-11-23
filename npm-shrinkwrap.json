@@ -1,12 +1,12 @@
 {
   "name": "@masstensor/diagnose",
-  "version": "0.8.4",
+  "version": "0.8.5",
   "lockfileVersion": 3,
   "requires": true,
   "packages": {
     "": {
       "name": "@masstensor/diagnose",
-      "version": "0.8.4",
+      "version": "0.8.5",
       "hasInstallScript": true,
       "license": "MIT",
       "dependencies": {

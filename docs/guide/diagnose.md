@@ -11,7 +11,7 @@ Use this guide if a person on site has shared a nine-letter invitation. Choose t
 
 ## Use Diagnose as a native agent skill
 
-Install the skill once through your agent's GitHub installation flow. All three agents use the same `skills/connect/` directory in the repository. The helper runs Diagnose 0.8.4 locally on demand with `npx` and needs Node.js 20.10 or later. There is no separate global Diagnose CLI installation for this workflow.
+Install the skill once through your agent's GitHub installation flow. All three agents use the same `skills/connect/` directory in the repository. The helper runs Diagnose 0.8.5 locally on demand with `npx` and needs Node.js 20.10 or later. There is no separate global Diagnose CLI installation for this workflow.
 
 ### Claude Code
 

@@ -11,6 +11,7 @@ import { MAX_OUTPUT, type AtomicTask, type Task, type Result } from './schema.js
 import { redact, sha256 } from './util.js';
 
 export type Execution = { result: Result; outputs: { stream: string; bytes: Buffer; encoding: 'utf8' | 'base64'; truncated?: boolean }[] };
+export type SerialState = 'serial-ready' | 'awaiting-serial-device';
 export function prepareWrite(task: Task): { sha: string | null; preview: string; parent: string } | undefined {
   if (task.operation !== 'file.write') return;
   const path = resolve(task.arguments.path);
@@ -23,7 +24,7 @@ function output(stream: string, bytes: Buffer): Execution['outputs'][number] {
   const clean = Buffer.from(redact(bytes.toString('utf8')));
   return { stream, bytes: clean.subarray(0, MAX_OUTPUT), encoding: 'utf8', truncated: clean.length > MAX_OUTPUT };
 }
-export async function execute(task: AtomicTask, signal: AbortSignal, write?: ReturnType<typeof prepareWrite>): Promise<Execution> {
+export async function execute(task: AtomicTask, signal: AbortSignal, write?: ReturnType<typeof prepareWrite>, serialState?: (state: SerialState) => void): Promise<Execution> {
   signal.throwIfAborted();
   switch (task.operation) {
     case 'system.inspect': return { result: { status: 'ok', data: await inspectSystem() }, outputs: [] };
@@ -74,7 +75,7 @@ export async function execute(task: AtomicTask, signal: AbortSignal, write?: Ret
     }
     case 'process.run': return runProcess(task.arguments, signal);
     case 'process.script': return runProcess({ ...task.arguments, executable: task.arguments.interpreter }, signal, task.arguments.script);
-    case 'serial.capture': case 'serial.exchange': return capture(task, signal);
+    case 'serial.capture': case 'serial.exchange': return capture(task, signal, serialState);
     default: throw new Error('This operation requires the session resource manager');
   }
 }
@@ -116,35 +117,85 @@ async function runProcess(args: Extract<AtomicTask, { operation: 'process.run' }
   });
 }
 
-async function capture(task: Extract<Task, { operation: 'serial.capture' | 'serial.exchange' }>, signal: AbortSignal): Promise<Execution> {
+async function capture(task: Extract<Task, { operation: 'serial.capture' | 'serial.exchange' }>, signal: AbortSignal, serialState?: (state: SerialState) => void): Promise<Execution> {
   if (task.operation === 'serial.capture' && task.arguments.dataHex !== undefined) throw new Error('Capture does not accept transmit data');
   if (task.operation === 'serial.exchange' && !task.arguments.dataHex) throw new Error('Exchange requires explicit dataHex');
+  if (task.operation === 'serial.exchange' && task.arguments.reattach) throw new Error('Only read-only serial capture can reattach');
+  const { path, baudRate, durationMs, reattach } = task.arguments;
+  let usbIdentity: string | undefined;
+  const identity = (port: Awaited<ReturnType<typeof SerialPort.list>>[number]) => port.vendorId && port.productId && port.serialNumber
+    ? [port.vendorId.toLowerCase(), port.productId.toLowerCase(), port.serialNumber].join(':') : undefined;
+  if (reattach) {
+    const ports = await SerialPort.list();
+    const selected = ports.find(port => port.path === path);
+    usbIdentity = selected && identity(selected);
+    if (!usbIdentity || ports.filter(port => identity(port) === usbIdentity).length !== 1) throw new Error('USB reattachment requires one uniquely identified USB serial port');
+  }
+  signal.throwIfAborted();
   return new Promise((resolveResult, reject) => {
-    const { path, baudRate, durationMs } = task.arguments;
-    const port = new SerialPort({ path, baudRate, autoOpen: false, rtscts: false, hupcl: false });
     const chunks: Buffer[] = []; let size = 0, done = false, truncated = false;
-    let timer: NodeJS.Timeout | undefined;
+    let timer: NodeJS.Timeout | undefined, openTimer: NodeJS.Timeout | undefined, poll: NodeJS.Timeout | undefined;
+    let port: SerialPort | undefined, waiting = false;
     const finish = (error?: Error): void => {
-      if (done) return; done = true; clearTimeout(timer); signal.removeEventListener('abort', abort);
-      const settle = (): void => error ? reject(error) : resolveResult({ result: { status: signal.aborted ? 'cancelled' : 'ok', truncated, data: { bytesRead: size, mayHaveReset: true } }, outputs: [output('serial', Buffer.concat(chunks))] });
-      if (port.isOpen) port.close(() => settle()); else settle();
+      if (done) return;
+      done = true;
+      clearTimeout(timer); clearTimeout(openTimer); clearTimeout(poll); signal.removeEventListener('abort', abort);
+      const settle = (): void => error ? reject(error) : resolveResult({
+        result: { status: signal.aborted ? 'cancelled' : waiting ? 'error' : 'ok', ...(waiting ? { error: 'The same USB serial device did not return before the capture ended' } : {}), truncated, data: { bytesRead: size, mayHaveReset: true } },
+        outputs: [output('serial', Buffer.concat(chunks))],
+      });
+      if (port?.isOpen) port.close(() => settle()); else settle();
     };
     const abort = (): void => finish();
-    port.on('error', finish); port.on('close', () => finish());
-    port.on('data', (chunk: Buffer) => { const keep = Math.min(chunk.length, MAX_OUTPUT - size); chunks.push(Buffer.from(chunk.subarray(0, keep))); size += keep; if (keep < chunk.length) { truncated = true; finish(); } });
-    signal.addEventListener('abort', abort, { once: true });
-    timer = setTimeout(() => finish(new Error('Serial open timeout')), 10000);
-    port.open(error => {
-      if (done) { if (port.isOpen) port.close(); return; }
-      if (error) { finish(error); return; }
-      clearTimeout(timer);
-      port.set({ dtr: false, rts: false }, setError => {
-        if (done) return;
-        if (setError) { finish(setError); return; }
-        if (signal.aborted) { finish(); return; }
-        timer = setTimeout(() => finish(), durationMs);
-        if (task.operation === 'serial.exchange') port.write(Buffer.from(task.arguments.dataHex!, 'hex'), writeError => { if (writeError) finish(writeError); });
+    const retry = () => {
+      poll = setTimeout(() => {
+        void SerialPort.list().then(ports => {
+          if (done) return;
+          const matching = ports.filter(candidate => identity(candidate) === usbIdentity);
+          if (matching.length === 1) attach(matching[0].path);
+          else retry();
+        }, () => { if (!done) retry(); });
+      }, 300);
+    };
+    const attach = (serialPath: string) => {
+      const current = port = new SerialPort({ path: serialPath, baudRate, autoOpen: false, rtscts: false, hupcl: false });
+      const lost = (error?: Error) => {
+        if (done || port !== current) return;
+        if (!timer) { finish(error ?? new Error('Serial port closed before capture was ready')); return; }
+        if (!reattach) { finish(error); return; }
+        clearTimeout(openTimer);
+        port = undefined;
+        if (current.isOpen) current.close();
+        if (!waiting) serialState?.('awaiting-serial-device');
+        waiting = true;
+        retry();
+      };
+      current.on('error', lost);
+      current.on('close', () => lost());
+      current.on('data', (chunk: Buffer) => {
+        if (done || port !== current) return;
+        const keep = Math.min(chunk.length, MAX_OUTPUT - size);
+        chunks.push(Buffer.from(chunk.subarray(0, keep)));
+        size += keep;
+        if (keep < chunk.length) { truncated = true; finish(); }
       });
-    });
+      openTimer = setTimeout(() => lost(new Error('Serial open timeout')), 10000);
+      current.open(error => {
+        if (done || port !== current) { if (current.isOpen) current.close(); return; }
+        if (error) { lost(error); return; }
+        current.set({ dtr: false, rts: false }, setError => {
+          if (done || port !== current) return;
+          clearTimeout(openTimer);
+          if (setError) { lost(setError); return; }
+          if (signal.aborted) { finish(); return; }
+          timer ??= setTimeout(() => finish(), durationMs);
+          waiting = false;
+          serialState?.('serial-ready');
+          if (task.operation === 'serial.exchange') current.write(Buffer.from(task.arguments.dataHex!, 'hex'), writeError => { if (writeError) finish(writeError); });
+        });
+      });
+    };
+    signal.addEventListener('abort', abort, { once: true });
+    attach(path);
   });
 }

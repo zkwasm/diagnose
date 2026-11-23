@@ -45,6 +45,78 @@ test('remembered connection reconnects with fresh encryption and never replays a
   } finally { connection.close(); probe.close(); await relay.close(); }
 });
 
+test('a temporary invitation resumes across relay and agent restarts without re-pairing or replaying a task', { skip: process.platform !== 'darwin', timeout: 25000 }, async () => {
+  const { spawn } = await import('node:child_process');
+  const { Client } = await import('@modelcontextprotocol/sdk/client/index.js');
+  const { StdioClientTransport } = await import('@modelcontextprotocol/sdk/client/stdio.js');
+  const root = scratch();
+  const operatorHome = scratch();
+  let relay = createRelay({ port: 0 });
+  const port = await relay.listen(), url = `ws://127.0.0.1:${port}`;
+  const probe = spawn('/bin/sh', ['-c', 'cat | /usr/bin/script -q /dev/null "$@"', 'resume-test', process.execPath, 'dist/cli.js', 'start', url], { detached: true, env: { ...process.env, HOME: root }, stdio: ['pipe', 'pipe', 'pipe'] });
+  let output = '', confirmed = false;
+  probe.stderr.resume();
+  probe.stdout.on('data', bytes => {
+    output += bytes.toString();
+    if (!confirmed && output.includes('Task approval for the next session?')) { confirmed = true; probe.stdin.write('e\n'); }
+  });
+  const invitation = /\b[a-z]{3}-[a-z]{3}-[a-z]{3}\b/;
+  const until = async (predicate: () => boolean) => {
+    for (let i = 0; i < 300 && !predicate(); i++) await new Promise(resolve => setTimeout(resolve, 20));
+    assert.ok(predicate(), output);
+  };
+  const connect = async (caseId?: string) => {
+    const client = new Client({ name: 'temporary-resume-test', version: '1' });
+    await client.connect(new StdioClientTransport({ command: process.execPath, args: ['dist/cli.js', 'mcp', url, ...(caseId ? ['--case', caseId] : [])], env: { ...process.env, HOME: operatorHome } as Record<string, string>, stderr: 'pipe' }));
+    return client;
+  };
+  let client: Awaited<ReturnType<typeof connect>> | undefined;
+  try {
+    await until(() => invitation.test(output));
+    client = await connect();
+    const call = async (name: string, args: Record<string, unknown>) => {
+      const result = await client!.callTool({ name, arguments: args });
+      assert.ok(!result.isError, JSON.stringify(result));
+      return result.structuredContent!;
+    };
+    await call('diagnose_pair', { code: output.match(invitation)![0], label: 'Local test' });
+    const { case: selectedCase } = await call('diagnose_case', { action: 'create', input: { goal: 'Check the test gateway', target: { name: 'Test Gateway', interface: 'usb' } } });
+    const caseId = (selectedCase as { id: string }).id;
+    const request = { operation: 'system.inspect', arguments: {}, reason: 'First round', requestId: randomUUID() };
+    const run = async (arg: typeof request) => {
+      const started = await call('diagnose_start', arg);
+      const result = await call('diagnose_wait', { id: started.id, timeoutMs: 3000 });
+      assert.equal((result.result as { status: string }).status, 'ok');
+    };
+    await run(request);
+    await relay.close();
+    await until(() => output.includes('Connection interrupted.'));
+    relay = createRelay({ port });
+    await relay.listen();
+    await until(() => output.includes('Reconnected.'));
+    await run({ ...request, reason: 'Second round', requestId: randomUUID() });
+    await call('diagnose_start', request);
+    const saved = readFileSync(join(operatorHome, '.diagnose', 'session-resume', caseId + '.meta'));
+    assert.equal(/D1\.[\w-]+\.[\w-]+/.test(saved.toString()), false);
+    await client.close();
+    client = await connect(caseId);
+    await run({ ...request, reason: 'Third round', requestId: randomUUID() });
+    const duplicate = await call('diagnose_start', request);
+    const result = await call('diagnose_wait', { id: duplicate.id, timeoutMs: 3000 });
+    assert.equal((result.result as { status: string }).status, 'duplicate');
+    assert.equal(output.split('Pairing code (').length - 1, 1);
+    assert.equal(output.split('Checking the on-site computer.').length - 1, 3);
+    await call('diagnose_disconnect', {});
+    await until(() => output.split('Pairing code (').length - 1 === 2);
+    assert.throws(() => readFileSync(join(operatorHome, '.diagnose', 'session-resume', caseId + '.meta')), { code: 'ENOENT' });
+  } finally {
+    await client?.close();
+    probe.stdin.end();
+    if (probe.pid) try { process.kill(-probe.pid, 'SIGTERM'); } catch {}
+    await relay.close();
+  }
+});
+
 test('actual host survives probe and relay restarts, pauses access, and revokes pairing', { skip: process.platform !== 'darwin', timeout: 25000 }, async () => {
   const { spawn } = await import('node:child_process'); const { resolve } = await import('node:path');
   const root = scratch(); let relay = createRelay({ port: 0 }); const port = await relay.listen(), url = `ws://127.0.0.1:${port}`;

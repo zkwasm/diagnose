@@ -9,3 +9,4 @@ test/live-*.ts
 .site-dist/
 video/audio-en/
 video/output/
+windows-installer/

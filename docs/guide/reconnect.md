@@ -1,8 +1,20 @@
-# Return to a saved device
+# Reconnect and return to a saved device
 
 Use remembered pairing for repeated visits to the same on-site computer. The person on site approves the relationship and can pause or revoke it later.
 
 [All guide scenarios](../../USER_GUIDE.md)
+
+## Resume the current session
+
+With 0.8.5 or later on both ends, one temporary invitation supports multiple rounds of diagnosis. Leave the on-site probe open while waiting for a physical check or when Wi-Fi drops. The diagnostic helper or MCP retries in the background and keeps the session's existing approval choice. Six hours without diagnostic activity ends the default session. The on-site user can end access immediately from the probe.
+
+In the native skill, keep using the same local session handle. With the full launcher, select the existing case after an agent restart:
+
+```sh
+diagnose agent codex --case CASE_ID
+```
+
+The selected case can resume the pairing using its encrypted local session record on the diagnostician's computer. The on-site probe must remain open. Use the original relay for a self-hosted session. A broken connection can leave the outcome of an in-flight task unknown. Check what actually happened before trying an authorized change again.
 
 ## Keep a device paired for future diagnosis
 

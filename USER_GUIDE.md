@@ -21,7 +21,7 @@ Pick the closest example. Each one shows what to prepare on site, what to ask th
 | Connect for the first time | [Quick start](#quick-start) |
 | Get help with your device | [Receive remote help](docs/guide/on-site.md) |
 | Set up Claude Code, Codex, or Gemini to diagnose a device | [Diagnose a remote device](docs/guide/diagnose.md) |
-| Reconnect without exchanging a new invitation | [Return to a saved device](docs/guide/reconnect.md) |
+| Continue after Wi-Fi drops or return to a saved device | [Reconnect and recover](docs/guide/reconnect.md) |
 | Load a device procedure or learn from a completed diagnosis | [Reuse and improve procedures](docs/guide/procedures.md) |
 | Start Diagnose from a script or use your own MCP client | [Automation and tool reference](docs/guide/automation.md) |
 | Fix a setup problem, recover access, or review activity | [Troubleshoot and review a session](docs/guide/troubleshooting.md) |
@@ -93,11 +93,11 @@ The agent loads the procedure at startup, runs the first checks when it has acce
 
 ### 4. Approve, diagnose, and finish
 
-Unless the on-site user chose **Approve everything**, they check the diagnostician's label and connection fingerprint before approving. The probe shows which permissions each choice grants. Auto approval covers both execution and result transmission. Commands run with the user's OS permissions, and results can reach the diagnostician and their AI provider.
+The probe explains its permission choices before creating a code. On current versions, pressing Enter selects **Approve everything** for the first invitation. Press `r` for manual review, which asks the on-site user to check the label and fingerprint at connection time. Automatic approval covers task execution with the user's OS permissions and result transmission to the diagnostician and their AI provider.
 
 The agent reports [pairing status and the first device check](docs/guide/diagnose.md#run-a-diagnostic-session) separately. Ask it to start with a read-only check, explain what it finds, and verify the original symptom after any authorized repair. See [what the skill can do](docs/guide/diagnose.md#what-the-native-skill-can-do) and [choose a diagnostic walkthrough](docs/guide/examples.md).
 
-The user can type `permissions ask` to revoke automatic approval or `exit` to stop access. See [how to review what was collected and sent](docs/guide/troubleshooting.md#review-local-history-and-clean-up).
+Keep the probe open between checks. On current versions, it can [resume the same session after Wi-Fi drops](docs/guide/reconnect.md#resume-the-current-session). Type `permissions ask` to revoke automatic approval or `exit` to stop access. See [how to review what was collected and sent](docs/guide/troubleshooting.md#review-local-history-and-clean-up).
 
 ## Requirements
 

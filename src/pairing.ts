@@ -37,7 +37,8 @@ export class RememberedConnection {
   private opening?: Promise<Operator>;
   private stopped = false;
   private candidate?: Peer;
-  constructor(private pairing: Pairing, private timeoutMs = 30000) {}
+  constructor(private pairing: Pick<Pairing, 'code' | 'relay' | 'label'>, private timeoutMs = 30000, private stopOnRemoteEnd = false) {}
+  get ended(): boolean { return this.stopped; }
   async connect(): Promise<Operator> {
     if (this.stopped) throw new Error('Connection ended');
     if (this.operator) return this.operator;
@@ -51,10 +52,14 @@ export class RememberedConnection {
       try {
         await peer.open(); if (this.stopped) throw new Error('Connection ended');
         const operator = new Operator(peer); this.operator = operator;
-        peer.once('closed', () => { if (this.operator === operator) this.operator = undefined; });
+        peer.once('closed', () => {
+          if (this.operator === operator) this.operator = undefined;
+          if (this.stopOnRemoteEnd && peer.remoteEnded) this.close();
+        });
         return operator;
       } catch (error) {
-        peer.close(); if (this.stopped || Date.now() >= deadline) throw error;
+        peer.close(); if (this.stopOnRemoteEnd && peer.remoteEnded) this.close();
+        if (this.stopped || Date.now() >= deadline) throw error;
         await new Promise(resolve => setTimeout(resolve, Math.min(300, Math.max(1, deadline - Date.now()))));
       } finally { clearTimeout(timer); }
     }

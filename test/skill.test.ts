@@ -4,14 +4,18 @@ import { mkdtemp, mkdir, writeFile, realpath } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
-import { loadSkill, promptLanguage, skillPrompt } from '../dist/skill.js';
+import { loadSkill, promptLanguage, selectLanguage, skillPrompt } from '../dist/skill.js';
 
 test('startup prompts follow the local message locale and fall back to English', async () => {
   assert.equal(await promptLanguage({ LC_ALL: 'zh_CN.UTF-8', LC_MESSAGES: 'en_US.UTF-8' }), 'zh');
   assert.equal(await promptLanguage({ LC_ALL: 'C.UTF-8', LC_MESSAGES: 'zh-Hant-TW' }), 'zh');
   assert.equal(await promptLanguage({ LC_ALL: 'fr_FR.UTF-8' }), 'en');
+  assert.equal(await promptLanguage({ LC_ALL: 'es_AR.UTF-8' }), 'es');
+  assert.equal(selectLanguage('es'), 'es');
+  assert.throws(() => selectLanguage('fr'), /--lang/);
   const path = 'local path with spaces.json';
   assert.match(skillPrompt(path, 'en'), /Use English for questions and reports/);
+  assert.match(skillPrompt(path, 'es'), /Usá español para las preguntas y los informes/);
   const chinese = skillPrompt(path, 'zh', 'workshop-laptop');
   assert.ok(chinese.includes(JSON.stringify(path)));
   assert.match(chinese, /workshop-laptop.+无需索取邀请码/);

@@ -26,7 +26,7 @@ function configuredCli() {
 const cli = process.env.DIAGNOSE_SKILL_CLI || configuredCli();
 const args = cli
   ? [cli, 'skill-session', action]
-  : ['--yes', '@masstensor/diagnose@0.8.4', 'skill-session', action];
+  : ['--yes', '@masstensor/diagnose@0.8.5', 'skill-session', action];
 const command = cli ? process.execPath : process.platform === 'win32' ? 'npx.cmd' : 'npx';
 const result = spawnSync(command, args, {
   stdio: 'inherit',

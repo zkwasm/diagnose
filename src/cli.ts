@@ -3,7 +3,7 @@ import { createInterface } from 'node:readline/promises';
 import { stdin, stdout } from 'node:process';
 import { createCode, createInvitation, INVITATION_MS } from './crypto.js';
 import { Peer } from './peer.js';
-import { ProbeEngine } from './engine.js';
+import { ProbeEngine, type PermissionMode } from './engine.js';
 import { Operator } from './operator.js';
 import { Audit, safeText } from './util.js';
 import { serveMcp } from './mcp.js';
@@ -23,6 +23,8 @@ import { cleanupLocal } from './maintenance.js';
 import { skillsCommand, skillsUsage } from './skill-library.js';
 import { knowledgeCommand, knowledgeUsage } from './knowledge-cli.js';
 import { DEFAULT_IDLE_MS } from './session-limits.js';
+import { promptLanguage, selectLanguage } from './skill.js';
+import { probeText } from './probe-text.js';
 
 async function attachTerminal(operator: Operator, id: string): Promise<void> {
   let done = false, cursor = 0; const wasRaw = stdin.isRaw;
@@ -46,7 +48,7 @@ async function main(): Promise<void> {
   if (['cases', 'drafts', 'vault'].includes(process.argv[2])) { await knowledgeCommand(process.argv[2], process.argv.slice(3)); return; }
   if (process.argv[2] === 'skills') { await skillsCommand(process.argv.slice(3)); return; }
   if (process.argv[2] === 'agent') { process.exitCode = await launchAgent(process.argv.slice(3)); return; }
-  const { positionals, values } = parseArgs({ args: process.argv.slice(2), allowPositionals: true, options: { 'session-minutes': { type: 'string', default: '0' }, 'idle-minutes': { type: 'string', default: String(DEFAULT_IDLE_MS / 60_000) }, device: { type: 'string' }, case: { type: 'string' }, name: { type: 'string' }, days: { type: 'string', default: '7' }, cursor: { type: 'string', default: '0' } } });
+  const { positionals, values } = parseArgs({ args: process.argv.slice(2), allowPositionals: true, options: { 'session-minutes': { type: 'string', default: '0' }, 'idle-minutes': { type: 'string', default: String(DEFAULT_IDLE_MS / 60_000) }, device: { type: 'string' }, case: { type: 'string' }, name: { type: 'string' }, days: { type: 'string', default: '7' }, cursor: { type: 'string', default: '0' }, lang: { type: 'string' }, 'desktop-stdio': { type: 'boolean' } } });
   const [command = 'help', relay = 'https://diagnose.fenginwind.com'] = positionals;
   if (command === 'history') { console.log(safeText(JSON.stringify(new History().list(), null, 2))); return; }
   if (command === 'show') { const cursor = Number(values.cursor); if (!Number.isSafeInteger(cursor) || cursor < 0) throw new Error('Cursor must be a nonnegative integer'); console.log(safeText(JSON.stringify(new History().show(positionals[1] ?? '', cursor), null, 2))); return; }
@@ -58,54 +60,89 @@ async function main(): Promise<void> {
   if (command === 'forget') { const store = new PairingStore(join(homedir(), '.diagnose', 'pairings')); store.remove(store.get(values.device ?? '', 'operator').id); console.log('Local pairing removed. Revoke on the user computer to invalidate its credential.'); return; }
   if (command === 'mcp') { await serveMcp(relay, values.device, values.case); return; }
   if (!['start', 'connect', 'terminal', 'pair'].includes(command)) { console.log(`diagnose start|connect|terminal|mcp [relay-url] [--device NAME]\ndiagnose pair [relay-url] --name NAME\ndiagnose history\ndiagnose show ID [--cursor OFFSET]\ndiagnose cleanup [--days 7]\ndiagnose devices\ndiagnose forget --device NAME\n${agentUsage}\n${(await import('./install-skill.js')).installSkillUsage}\n${skillsUsage}\n${knowledgeUsage}\nNode.js >=20.10. Pairing codes are entered interactively, never as arguments.`); return; }
-  if (!stdin.isTTY || !stdout.isTTY) throw new Error('Interactive terminal required. AI clients should use diagnose mcp.');
-  const rl = createInterface({ input: stdin, output: stdout });
+  const desktop = command === 'start' && values['desktop-stdio'];
+  if (!desktop && (!stdin.isTTY || !stdout.isTTY)) throw new Error('Interactive terminal required. AI clients should use diagnose mcp.');
+  const rl = createInterface({ input: stdin, output: desktop ? undefined : stdout, terminal: !desktop });
+  const display = (event: string, text: string, code?: string) => {
+    if (desktop) console.log('\x1e' + JSON.stringify({ event, text, ...(code && { code }) }));
+    else console.log(text);
+  };
+  const hostQuestion = (event: string, text: string, signal: AbortSignal) => {
+    if (desktop) { display(event, text); return rl.question('', { signal }); }
+    return rl.question(text + ' ', { signal });
+  };
   const shutdown = new AbortController(); let peer: Peer | undefined, engine: ProbeEngine | undefined;
   const forwards = new Map<string, Forward>();
   let resources: SessionResources | undefined, promptActive = false, secretPending: Promise<void> | undefined;
   let localCommand: (value: string) => boolean = () => false;
-  const stop = () => { shutdown.abort(); peer?.close('User ended session'); void resources?.revoke().catch(() => {}); rl.close(); };
+  const stop = () => {
+    if (shutdown.signal.aborted) return;
+    shutdown.abort();
+    engine?.cancelAll();
+    const current = peer;
+    if (current) void Promise.race([current.send({ type: 'session.closed', reason: 'User ended session' }).catch(() => {}), delay(500)])
+      .then(() => current.close('User ended session'));
+    void resources?.revoke().catch(() => {});
+    rl.close();
+  };
   rl.on('SIGINT', stop); process.once('SIGINT', stop); process.once('SIGTERM', stop);
-  rl.once('close', () => { shutdown.abort(); peer?.close('User terminal closed'); });
+  rl.once('close', stop);
   try {
     if (command === 'start') {
+      const ui = probeText[values.lang ? selectLanguage(values.lang) : await promptLanguage()];
       const store = new PairingStore();
+      let temporary: { code: string; mode: PermissionMode; idleUntil: number; endAt: number; tasks: Set<string> } | undefined;
+      const idleMs = idleMinutes * 60000;
       console.log('Task details and collected results are saved in encrypted local history for up to 7 days (256 MiB budget). View with diagnose history / diagnose show ID; remove inactive records with diagnose cleanup --days 0. Scripts may contain sensitive data.');
       let nextSessionApproval: 'review' | 'tasks' | 'everything' = 'review';
       if (!store.list('host').length) {
-        console.log('Auto approval lets the diagnostician run tasks with your OS permissions and receive results without further prompts.');
-        console.log('Approve everything also lets anyone with the next one-time invitation connect without confirmation. Share that invitation privately.');
-        const choice = (await rl.question('Task approval for the next session? [Enter=review / a=auto tasks only / e=approve everything] ', { signal: shutdown.signal })).trim().toLowerCase();
-        nextSessionApproval = choice === 'e' ? 'everything' : choice === 'a' ? 'tasks' : 'review';
-        console.log(nextSessionApproval === 'everything' ? 'Approve everything selected for this temporary invitation: connection, task execution, and result transmission.'
-          : nextSessionApproval === 'tasks' ? 'Auto approval selected for the next temporary session, subject to your pairing confirmation.'
-            : 'You will review task execution and result transfers.');
+        console.log(ui.startupAccess);
+        console.log(ui.startupCode);
+        while (true) {
+          const choice = (await hostQuestion('startup', ui.startup, shutdown.signal)).trim().toLowerCase();
+          if (choice === 'q') { stop(); return; }
+          if (!['', 'e', 'a', 'r'].includes(choice)) continue;
+          nextSessionApproval = choice === 'r' ? 'review' : choice === 'a' ? 'tasks' : 'everything';
+          break;
+        }
+        console.log(nextSessionApproval === 'everything' ? ui.startupEverything : nextSessionApproval === 'tasks' ? ui.startupTasks : ui.startupReview);
       }
       const firstAudit = new Audit(); resources = new SessionResources(join(homedir(), '.diagnose', 'resources'), firstAudit); let sessions = 0;
       while (!shutdown.signal.aborted) {
       let remembered: import('./pairing.js').Pairing | undefined = store.list('host')[0];
       if (remembered?.paused) { console.log('Remote access is paused. Type resume, unpair, or exit.'); const controls = (line: string) => { if (line.trim() === 'resume') { remembered!.paused = false; store.save(remembered!); firstAudit.record('pairing.resume', { id: remembered!.id }); } else if (line.trim() === 'unpair') { store.remove(remembered!.id); firstAudit.record('pairing.revoked', { id: remembered!.id }); remembered = undefined; } else if (line.trim() === 'permissions ask') { remembered!.autoUntil = 0; store.save(remembered!); firstAudit.record('permissions.revoked', { id: remembered!.id }); console.log('Automatic permissions revoked; access remains paused.'); } else if (line.trim() === 'exit') stop(); else console.log('Access paused. Type resume, unpair, permissions ask, or exit.'); }; rl.on('line', controls); try { while (remembered?.paused && !shutdown.signal.aborted) { await delay(300, undefined, { signal: shutdown.signal }).catch(() => {}); remembered = store.list('host')[0]; } } finally { rl.off('line', controls); } }
       if (shutdown.signal.aborted) break;
-      const audit = sessions++ === 0 ? firstAudit : new Audit(); const code = remembered?.code ?? createInvitation(); let provision: string | undefined;
+      const resuming = remembered ? undefined : temporary;
+      const tasks = resuming ? resuming.tasks : new Set<string>();
+      const audit = sessions++ === 0 ? firstAudit : new Audit(); const code = remembered?.code ?? temporary?.code ?? createInvitation(); let provision: string | undefined;
       let grantTimer: NodeJS.Timeout | undefined;
-      peer = new Peer({ role: 'host', code, relay: remembered?.relay ?? relay, sessionMs: remembered ? 0 : sessionMinutes * 60000, provision: () => provision, accept: async ({ label, fingerprint, signal, remember }) => {
+      peer = new Peer({ role: 'host', code, relay: remembered?.relay ?? relay, sessionMs: remembered || resuming ? 0 : sessionMinutes * 60000, provision: () => provision,
+        provisionResume: !remembered && !resuming ? () => {
+          const now = Date.now();
+          temporary = { code: createCode(), mode: engine!.permissionMode, idleUntil: idleMs ? now + idleMs : Infinity, endAt: sessionMinutes ? now + sessionMinutes * 60000 : Infinity, tasks };
+          return temporary.code;
+        } : undefined, accept: async ({ label, fingerprint, signal, remember }) => {
+        if (resuming) {
+          const valid = temporary === resuming && Date.now() < Math.min(resuming.idleUntil, resuming.endAt);
+          if (valid) audit.record('session.resumed', {});
+          return valid;
+        }
         if (remembered) { audit.record('pairing.reconnected', { id: remembered.id }); return !remembered.paused; }
         if (remember) console.log('REMEMBER THIS DIAGNOSTICIAN: this computer will accept future connections using a new private credential until you type "unpair". Task approval remains enabled. AUTO lasts one hour, across reconnects.');
-        console.log(`\nRequested by: ${safeText(label)} (self-asserted identity)\nFingerprint: ${fingerprint}\nResults will be available to the diagnostician and their AI provider.`);
+        console.log(`\n${ui.party}: ${safeText(label)}\nFingerprint: ${fingerprint}\n${ui.sharing}`);
         if (!remember && nextSessionApproval === 'everything') {
           signal.throwIfAborted();
           nextSessionApproval = 'review';
           audit.record('session.pairing-decision', { allowed: true, fingerprint, approval: 'everything' });
           engine!.setPermissionMode('auto');
-          console.log('Connection approved by your startup selection (Approve everything).');
+          console.log(ui.pairedAutomatically);
           return true;
         }
         const preselectedAuto = nextSessionApproval === 'tasks' && !remember;
         console.log(preselectedAuto ? 'You selected auto approval at startup. Choose y to confirm it or r to connect with per-task review.' : 'Choose y: approve each task/batch and its transfer.\nChoose a: grant automatic execution AND transmission (one hour if remembered; otherwise this temporary session).');
         console.log('AUTO: commands have your OS permissions; results go to the diagnostician and their AI without further prompts. Raw terminal, file and tunnel channels are NOT redacted. A channel grant includes continuing input/output within its scope.\nRevoke locally with "permissions ask", cancel with "cancel", or end with Ctrl+C. Already transmitted data cannot be recalled.');
-        const prompt = preselectedAuto ? 'Allow this temporary session with auto approval? [y / r=review / N] '
-          : remember ? 'Remember and allow this diagnostician? [y / a=auto for 1 hour / N] ' : 'Allow this temporary diagnostic session? [y / a=auto / N] ';
-        const answer = (await rl.question(prompt, { signal })).trim().toLowerCase();
+        const prompt = preselectedAuto ? ui.pairAuto : remember ? ui.pairRemember : ui.pairReview;
+        const answer = (await hostQuestion(preselectedAuto ? 'pair-auto' : 'pair-review', prompt, signal)).trim().toLowerCase();
         const auto = preselectedAuto ? answer === 'y' : answer === 'a';
         const allowed = answer === 'y' || (preselectedAuto ? answer === 'r' : auto);
         if (allowed) nextSessionApproval = 'review';
@@ -115,19 +152,17 @@ async function main(): Promise<void> {
       } });
       engine = new ProbeEngine(peer, async request => {
         const reason = safeText(request.task.reason).replace(/\s+/g, ' ').slice(0, 160);
-        console.log(`\n${request.stage === 'execute' ? 'Task' : 'Results'}: ${request.task.operation}${reason ? `\nDiagnostician’s reason: ${reason}` : ''}`);
+        console.log(`\n${request.stage === 'execute' ? ui.task : ui.results}: ${request.task.operation}${reason ? `\n${ui.reason}: ${reason}` : ''}`);
         const signal = request.signal ?? shutdown.signal;
         const continuous = request.stage === 'send' && resourceOperation(request.task.operation);
-        const question = request.stage === 'execute' ? 'Allow exactly this operation? Commands run with your OS permissions.'
-          : continuous ? 'Allow ongoing input and output for this connection? Traffic is sent without redaction or further review.'
-            : `Send these results (${request.bytes ?? 0} output bytes plus metadata)?`;
+        const question = request.stage === 'execute' ? ui.reviewTask : continuous ? ui.reviewLive : ui.reviewResults(request.bytes ?? 0);
         const steps = request.task.operation === 'batch.run' ? request.task.arguments.steps : [request.task];
-        if (request.stage === 'execute' && steps.some(step => step.operation.startsWith('serial.'))) console.log('Serial control lines may reset the device.');
-        console.log('Automatically run tasks and send results for the rest of this session with option a. Tasks use your permissions and raw channels may include sensitive data.');
+        if (request.stage === 'execute' && steps.some(step => step.operation.startsWith('serial.'))) console.log(ui.serialReset);
+        console.log(ui.reviewAuto);
         while (true) {
           let answer: string;
           promptActive = true;
-          try { answer = (await rl.question(question + ' [y=once / a=automatic / d=details / Enter=reject] ', { signal })).trim(); }
+          try { answer = (await hostQuestion('review', question + ' ' + ui.reviewChoices, signal)).trim(); }
           finally { promptActive = false; }
           signal.throwIfAborted();
           switch (answer.toLowerCase()) {
@@ -135,7 +170,7 @@ async function main(): Promise<void> {
             case 'a':
               audit.record('permissions.session-granted', { task: request.task.id, stage: request.stage });
               engine!.setPermissionMode('auto');
-              console.log('Automatic approval enabled for this session. Type "permissions ask" to turn it off.');
+              console.log(ui.autoEnabled);
               return true;
             case 'd':
               console.log(`Task: ${request.task.id}\nSHA256: ${request.digest}\n${safeText(request.preview)}`);
@@ -146,14 +181,46 @@ async function main(): Promise<void> {
               if (engine!.permissionMode === 'auto') return true;
           }
         }
-      }, audit, message => console.log(safeText(message)), { resources, idleMs: remembered ? 0 : idleMinutes * 60000, lifetimeMs: remembered ? 0 : sessionMinutes * 60000 });
+      }, audit, (message, activity) => {
+        if (!activity) console.log(safeText(message));
+        else if (activity.stage === 'send') console.log(ui.sending);
+        else if (activity.task.operation.startsWith('system.')) console.log(ui.collecting);
+        else if (activity.task.operation.startsWith('serial.')) console.log(ui.capture);
+        else console.log(ui.working);
+      }, {
+        resources, idleMs: remembered || resuming ? 0 : idleMs, lifetimeMs: remembered || resuming ? 0 : sessionMinutes * 60000,
+        sessionTasks: remembered ? undefined : tasks,
+        serialState: state => display(state, state === 'serial-ready' ? ui.serialReady : ui.serialMissing),
+      });
+      if (resuming?.mode === 'auto') engine.setPermissionMode('auto');
+      const transport = peer;
+      let expiration: NodeJS.Timeout | undefined;
+      const scheduleExpiration = () => {
+        clearTimeout(expiration);
+        if (!temporary) return;
+        const remaining = Math.min(temporary.idleUntil, temporary.endAt) - Date.now();
+        if (Number.isFinite(remaining)) expiration = setTimeout(() => {
+          temporary = undefined;
+          engine?.cancelAll();
+          void resources?.revoke().catch(() => {});
+          void (async () => {
+            if (active) await transport.send({ type: 'session.closed', reason: 'Temporary session expired' }).catch(() => {});
+            transport.close('Temporary session expired');
+          })();
+        }, Math.max(1, remaining));
+      };
+      scheduleExpiration();
       const scheduleGrant = () => { clearTimeout(grantTimer); if (remembered && automatic(remembered)) { engine!.setPermissionMode('auto'); if (remembered.autoUntil !== null) grantTimer = setTimeout(() => { remembered!.autoUntil = 0; store.save(remembered!); engine!.setPermissionMode('ask'); }, Math.max(1, remembered.autoUntil - Date.now())); } };
       scheduleGrant();
       let active = false, autoRequestedAt = 0;
       peer.on('active', () => {
         active = true;
-        console.log(`Connected. ${engine!.permissionMode === 'auto' ? 'Tasks and result transfers are automatically approved.' : 'You will review tasks and result transfers.'} Press Ctrl+C to end the session.`);
+        scheduleExpiration();
+        display('connected', `${resuming ? ui.reconnected : ui.connected} ${engine!.permissionMode === 'auto' ? ui.automatic : ui.manual}${desktop ? '' : ' ' + ui.stop}`);
       });
+      const activity = () => { if (temporary && idleMs) { temporary.idleUntil = Date.now() + idleMs; scheduleExpiration(); } };
+      peer.on('activity', activity);
+      peer.on('message', activity);
       localCommand = value => {
         if (['pairing', 'pause', 'resume', 'unpair'].includes(value)) {
           if (value === 'pairing') { console.log(remembered ? `Paired with: ${safeText(remembered.label)} (${remembered.id}); ${remembered.paused ? 'paused' : 'available'}; auto: ${automatic(remembered) ? remembered.autoUntil === null ? 'until revoked' : new Date(remembered.autoUntil).toISOString() : 'off'}` : 'No remembered diagnostician'); return true; }
@@ -176,7 +243,7 @@ async function main(): Promise<void> {
         if (value.startsWith('recover ')) { const id = value.slice(8).trim(); console.log(`Resource: ${id}\nNew recovery credential (share privately): ${resources!.renewCredential(id)}`); return true; }
         if (value.startsWith('secret ')) {
           if (promptActive || secretPending) { console.log('Finish the current approval before local hidden input.'); return true; }
-          if (process.platform === 'win32') { console.log('Hidden local input is not yet validated on Windows; use native local OS authentication.'); return true; }
+          if (desktop || process.platform === 'win32') { console.log('Use native local OS authentication.'); return true; }
           const id = value.slice(7).trim();
           secretPending = (async () => {
             console.log('Local input goes directly to the approved process. Use only a trusted foreground program; its output can still be transmitted.');
@@ -193,13 +260,22 @@ async function main(): Promise<void> {
       rl.on('line', onLocalLine);
       try {
         await peer.open();
-        console.log(remembered ? `Remembered diagnostician: ${safeText(remembered.label)}. Waiting for connections. Local commands: pairing, pause, resume, unpair, permissions ask, permissions auto [forever], cancel, jobs, exit. Audit: ${audit.path}` : `Relay: ${relay}\nAudit: ${audit.path}\nPairing code (${INVITATION_MS / 3600000} hours, one-time, share privately):\n${code}\nCtrl+C ends the session and cancels active tasks.`);
-        console.log(`Session ended: ${safeText(await peer.ended)}`);
+        if (remembered) console.log(`Remembered diagnostician: ${safeText(remembered.label)}. Waiting for connections.`);
+        else if (!resuming) display('code', desktop ? ui.code(INVITATION_MS / 3600000) : `${ui.code(INVITATION_MS / 3600000)}\n${code}\n${ui.stop}`, code);
+        const reason = await peer.ended;
+        if (temporary && (peer.remoteEnded || ['Idle timeout', 'Session lifetime exceeded'].includes(reason))) {
+          temporary = undefined;
+          await resources.revoke();
+        }
+        if (temporary) {
+          temporary.mode = engine.permissionMode;
+          if (active) display('reconnecting', ui.waiting);
+        } else display('ended', `Session ended: ${safeText(reason)}`);
         if (nextSessionApproval === 'everything') nextSessionApproval = 'review';
       } catch (error) { const collision = (error as Error).message.includes('Invitation locator occupied'); if (!shutdown.signal.aborted) console.log(collision ? 'Choosing another invitation code...' : `Relay unavailable: ${safeText((error as Error).message)}. Retained work remains local; retrying in 3 seconds.`); await delay(collision ? 100 : 3000, undefined, { signal: shutdown.signal }).catch(() => {}); }
-      finally { clearTimeout(grantTimer); rl.off('line', onLocalLine); }
+      finally { clearTimeout(grantTimer); clearTimeout(expiration); if (temporary) { temporary.mode = engine.permissionMode; if (Date.now() >= Math.min(temporary.idleUntil, temporary.endAt)) temporary = undefined; } rl.off('line', onLocalLine); }
       active = false; if (secretPending) await secretPending;
-      if (!shutdown.signal.aborted) { console.log('Probe is still running. Remembered pairing survives reconnects; commands are never replayed. Ctrl+C stops access and closes resources; trust remains until unpair.'); await delay(300, undefined, { signal: shutdown.signal }).catch(() => {}); }
+      if (!shutdown.signal.aborted) await delay(300, undefined, { signal: shutdown.signal }).catch(() => {});
       }
     } else {
       const store = new PairingStore(join(homedir(), '.diagnose', 'pairings'));

@@ -28,7 +28,7 @@ export const atomicTaskSchema = z.discriminatedUnion('operation', [
   z.object({ ...common, operation: z.literal('net.forward'), arguments: z.object({ direction: z.enum(['local', 'remote', 'socks']), host: z.string().min(1).max(253).default('127.0.0.1'), port: z.number().int().min(0).max(65535).default(0), bindHost: z.enum(['127.0.0.1', '::1']).default('127.0.0.1'), bindPort: z.number().int().min(0).max(65535).default(0), allowedHosts: z.array(z.string().min(1).max(253)).min(1).max(100).default(['*']) }).strict() }).strict(),
   z.object({ ...common, operation: z.literal('process.run'), arguments: z.object({ executable: path, args: z.array(z.string().max(65536)).max(128).default([]), cwd: path.optional(), timeoutMs: z.number().int().min(100).max(300000).default(60000) }).strict() }).strict(),
   z.object({ ...common, operation: z.literal('process.script'), arguments: z.object({ interpreter: path, script: z.string().min(1).max(256 * 1024), args: z.array(z.string().max(65536)).max(128).default([]), cwd: path.optional(), timeoutMs: z.number().int().min(100).max(300000).default(60000) }).strict() }).strict(),
-  ...(['serial.capture', 'serial.exchange'] as const).map(operation => z.object({ ...common, operation: z.literal(operation), arguments: z.object({ path, baudRate: z.number().int().min(300).max(3000000).default(115200), durationMs: z.number().int().min(100).max(300000).default(20000), dataHex: z.string().regex(/^(?:[a-fA-F0-9]{2})*$/).max(65536).optional() }).strict() }).strict()),
+  ...(['serial.capture', 'serial.exchange'] as const).map(operation => z.object({ ...common, operation: z.literal(operation), arguments: z.object({ path, baudRate: z.number().int().min(300).max(3000000).default(115200), durationMs: z.number().int().min(100).max(300000).default(20000), dataHex: z.string().regex(/^(?:[a-fA-F0-9]{2})*$/).max(65536).optional(), reattach: z.literal(true).optional() }).strict() }).strict()),
 ]);
 export const batchTaskSchema = z.object({ ...common, operation: z.literal('batch.run'), arguments: z.object({ steps: z.array(atomicTaskSchema).min(1).max(32), stopOnError: z.boolean().default(true), timeoutMs: z.number().int().min(100).max(300000).default(300000) }).strict() }).strict().refine(task => new Set([task.id, ...task.arguments.steps.map(step => step.id)]).size === task.arguments.steps.length + 1, 'Batch task IDs must be unique');
 export const taskSchema = z.union([atomicTaskSchema, batchTaskSchema]);
@@ -37,16 +37,19 @@ export type BatchTask = z.infer<typeof batchTaskSchema>;
 export type Task = z.infer<typeof taskSchema>;
 export type TaskInput = { operation: Task['operation']; arguments: Record<string, unknown>; reason: string };
 export type ApprovalStage = 'execute' | 'send';
+const taskPhase = z.enum(['awaiting-execution-approval', 'running', 'serial-ready', 'awaiting-serial-device', 'awaiting-transfer-approval', 'sending-results']);
+export type TaskPhase = z.infer<typeof taskPhase>;
 export type Approval = { stage: ApprovalStage; task: Task; digest: string; preview: string; bytes?: number; signal?: AbortSignal };
 export type ApprovalHandler = (request: Approval) => Promise<boolean>;
 export type Result = { status: 'ok' | 'error' | 'denied' | 'cancelled' | 'duplicate'; data?: unknown; error?: string; exitCode?: number | null; truncated?: boolean };
 export const resourceRequestSchema = z.object({ id: z.string().uuid().optional(), action: z.enum(['list', 'read', 'input', 'resize', 'signal', 'status', 'close', 'commit', 'connect', 'accept']), cursor: z.number().int().min(0).default(0), limit: z.number().int().min(1).max(65536).default(65536), data: z.string().max(90000).optional(), eof: z.boolean().default(false), cols: z.number().int().min(20).max(500).optional(), rows: z.number().int().min(5).max(200).optional(), signal: z.enum(['SIGINT', 'SIGTERM', 'SIGKILL', 'SIGHUP', 'SIGQUIT']).optional(), host: z.string().min(1).max(253).optional(), port: z.number().int().min(1).max(65535).optional() }).strict();
 export type ResourceRequest = z.infer<typeof resourceRequestSchema>;
 export type WireMessage =
-  | { type: 'session.accepted'; label: string; fingerprint: string; credential?: string }
+  | { type: 'session.accepted'; label: string; fingerprint: string; credential?: string; resume?: string }
   | { type: 'session.closed'; reason: string }
   | { type: 'task.request'; task: Task; sequence?: number }
   | { type: 'task.started'; id: string; digest: string }
+  | { type: 'task.progress'; id: string; phase: TaskPhase }
   | { type: 'task.output'; id: string; stream: string; chunk: string; index: number }
   | { type: 'task.result'; id: string; result: Result }
   | { type: 'task.cancel'; id: string }
@@ -66,9 +69,10 @@ export function parseMessage(value: unknown): WireMessage {
     case 'resource.result': return z.object({ type: z.literal('resource.result'), requestId: z.string().uuid(), value: z.unknown().optional(), error: z.string().max(2000).optional() }).strict().parse(value);
     case 'ping': return basic.activity === true ? { type: 'ping', activity: true } : { type: 'ping' };
     case 'pong': return { type: 'pong' };
-    case 'session.accepted': return z.object({ type: z.literal('session.accepted'), label: z.string().max(120), fingerprint: z.string().max(100), credential: z.string().regex(/^D1\.[A-Za-z0-9_-]{16}\.[A-Za-z0-9_-]{43}$/).optional() }).strict().parse(value);
+    case 'session.accepted': return z.object({ type: z.literal('session.accepted'), label: z.string().max(120), fingerprint: z.string().max(100), credential: z.string().regex(/^D1\.[A-Za-z0-9_-]{16}\.[A-Za-z0-9_-]{43}$/).optional(), resume: z.string().regex(/^D1\.[A-Za-z0-9_-]{16}\.[A-Za-z0-9_-]{43}$/).optional() }).strict().parse(value);
     case 'session.closed': return z.object({ type: z.literal('session.closed'), reason: z.string().max(200) }).strict().parse(value);
     case 'task.started': return z.object({ type: z.literal('task.started'), id: z.string().uuid(), digest: z.string().regex(/^[a-f0-9]{64}$/) }).strict().parse(value);
+    case 'task.progress': return z.object({ type: z.literal('task.progress'), id: z.string().uuid(), phase: taskPhase }).strict().parse(value);
     case 'task.output': return z.object({ type: z.literal('task.output'), id: z.string().uuid(), stream: z.string().max(20), chunk: z.string().max(CHUNK_SIZE * 2), index: z.number().int().min(0) }).strict().parse(value);
     case 'task.result': return z.object({ type: z.literal('task.result'), id: z.string().uuid(), result: z.object({ status: z.enum(['ok', 'error', 'denied', 'cancelled', 'duplicate']), data: z.unknown().optional(), error: z.string().max(2000).optional(), exitCode: z.number().int().nullable().optional(), truncated: z.boolean().optional() }).strict() }).strict().parse(value);
     default: throw new Error('Unsupported message type');

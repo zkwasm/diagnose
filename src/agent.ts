@@ -6,20 +6,21 @@ import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import { PairingStore } from './pairing.js';
-import { caseInstructions, promptLanguage, skillPrompt } from './skill.js';
+import { caseInstructions, promptLanguage, selectLanguage, skillPrompt } from './skill.js';
 import { resolveSkill } from './skill-library.js';
 import { Cases } from './cases.js';
 import { agentCommand } from './agent-command.js';
 
-export const agentUsage = 'diagnose agent codex|claude|gemini [--device NAME] [--case ID] [--skill FILE.md|DIRECTORY|library:NAME@REVISION] [--relay URL] [-- agent arguments...]';
+export const agentUsage = 'diagnose agent codex|claude|gemini [--device NAME] [--case ID] [--skill FILE.md|DIRECTORY|library:NAME@REVISION] [--relay URL] [--lang en|zh|es] [-- agent arguments...]';
 
 export async function launchAgent(argv: string[]): Promise<number> {
   const separator = argv.indexOf('--');
   const extra = separator < 0 ? [] : argv.slice(separator + 1);
-  const { positionals, values } = parseArgs({ args: separator < 0 ? argv : argv.slice(0, separator), allowPositionals: true, options: { relay: { type: 'string' }, skill: { type: 'string' }, device: { type: 'string' }, case: { type: 'string' }, help: { type: 'boolean', short: 'h' } } });
+  const { positionals, values } = parseArgs({ args: separator < 0 ? argv : argv.slice(0, separator), allowPositionals: true, options: { relay: { type: 'string' }, skill: { type: 'string' }, device: { type: 'string' }, case: { type: 'string' }, lang: { type: 'string' }, help: { type: 'boolean', short: 'h' } } });
   if (values.help || !positionals.length) { console.log(agentUsage); return 0; }
   const [agent] = positionals;
   if (positionals.length !== 1 || !['codex', 'claude', 'gemini'].includes(agent)) throw new Error(agentUsage);
+  const language = values.lang ? selectLanguage(values.lang) : await promptLanguage();
   if (values.device) new PairingStore().get(values.device, 'operator');
   const selectedCase = values.case ? new Cases().get(values.case) : undefined;
   if (selectedCase?.host && values.device && selectedCase.host !== values.device) throw new Error('Selected case belongs to a different paired computer');
@@ -38,7 +39,6 @@ export async function launchAgent(argv: string[]): Promise<number> {
   try {
     let prompt: string | undefined, taskDirectory: string | undefined;
     if (skill || selectedCase) {
-      const language = await promptLanguage();
       directory = await mkdtemp(join(tmpdir(), 'diagnose-agent-'));
       taskDirectory = join(directory, 'task'); await mkdir(taskDirectory, { mode: 0o700 });
       const snapshot = join(taskDirectory, 'task.json');

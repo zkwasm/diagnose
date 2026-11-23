@@ -28,6 +28,12 @@ Implementation: pinned `@serenity-kit/opaque` 1.1.0, using its default memory-co
 
 The WebSocket endpoint remains `/v1/connect`. Registration version 2 accepts only `S2.` plus two lowercase letters. Version 1 accepts the existing 16-character room IDs. The formats cannot negotiate or silently downgrade between mechanisms. New clients accept old `D1` invitations; old clients cannot use new short invitations. Upgrade both endpoints and the relay for the short-code flow.
 
+## Temporary session resume
+
+An updated operator advertises temporary resume in its encrypted Noise hello. Once the user approves a temporary session, an updated probe can return a separate random D1 credential inside the encrypted acceptance message. A relay receives only the new room locator. A resumed transport performs another Noise handshake with fresh keys. Older peers never receive an unsolicited resume field.
+
+The probe retains the credential, approval state, task identifiers and expiry in memory while it runs. The same request ID cannot start work twice during that session. Losing a reply can still leave the task outcome unknown. When a case is selected, the operator can store its credential in the encrypted local journal for an agent restart. The original invitation cannot reconnect after use. A graceful end sends an authenticated close message. Probe exit or expiry invalidates the in-memory credential even if the other endpoint is offline.
+
 OPAQUE messages are strict JSON binary frames with exactly `pake` and `value` fields. Stage values are `start`, `response`, `finish`; each frame is bounded to 4 KiB and the encoded value to 2,048 characters. Stage ordering is enforced. The join endpoint accepts one relay join notification, preventing repeated password trials against one client handshake. The probe keeps a local invitation deadline and attempt counter independent from relay state. After OPAQUE completes, the existing Noise framing, counters, approval and resource authorization remain in force.
 
 The relay can see locators, opaque handshake transcripts, source IPs, timing and traffic sizes. It can interrupt service or send misleading control messages, but those messages do not disable endpoint expiry/attempt limits or authorize commands. Session transport continues to require TLS for non-loopback relays.

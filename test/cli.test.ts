@@ -18,7 +18,7 @@ test('host CLI shows details on request and can switch to automatic approval dur
   const code = new Promise<string>(resolve => { codeResolve = resolve; });
   child.stdout.on('data', bytes => {
     text += bytes.toString(); const match = /\b[a-z]{3}-[a-z]{3}-[a-z]{3}\b/.exec(text); if (match) codeResolve(match[0]);
-    if (!startup && text.includes('Task approval for the next session?')) { startup = true; child.stdin.write('\n'); }
+    if (!startup && text.includes('Task approval for the next session?')) { startup = true; child.stdin.write('r\n'); }
     if (!pairing && text.includes('Allow this temporary diagnostic session?')) { pairing = true; child.stdin.write('y\n'); }
     if (!details && text.includes('Allow exactly this operation?')) { details = true; child.stdin.write('d\n'); }
     if (!executing && text.includes('SHA256:')) { executing = true; child.stdin.write('y\n'); }
@@ -88,7 +88,7 @@ test('Approve everything accepts a short invitation once and automatically execu
   child.stderr.resume();
   child.stdout.on('data', bytes => {
     output += bytes.toString();
-    if (!startup && output.includes('e=approve everything')) { startup = true; child.stdin.write('e\n'); }
+    if (!startup && output.includes('Enter=approve everything')) { startup = true; child.stdin.write('\n'); }
     if (!secondPrompt && output.includes('Allow this temporary diagnostic session?')) { secondPrompt = true; child.stdin.write('n\n'); }
   });
   const codes = () => [...new Set(output.match(/\b[a-z]{3}-[a-z]{3}-[a-z]{3}\b/g) ?? [])];
@@ -105,7 +105,7 @@ test('Approve everything accepts a short invitation once and automatically execu
     assert.match(output, /Connection approved by your startup selection/);
     const result = await operator.run({ operation: 'system.inspect', arguments: {}, reason: 'Verify session-wide approval' });
     assert.equal(result.result.status, 'ok');
-    assert.match(output, /\[AUTO send\] system\.inspect/);
+    assert.match(output, /Sending diagnostic results to support/);
     assert.doesNotMatch(output, /EXECUTION APPROVAL|TRANSFER APPROVAL/);
     assert.equal(secondPrompt, false);
     peer.close();
@@ -130,7 +130,7 @@ test('terminal CLI attaches a native PTY and executes interactive input', { skip
 test('host CLI re-pairs after disconnect and resumes retained process without rerunning it', { skip: process.platform !== 'darwin', timeout: 15000 }, async () => {
   const childHome = mkdtempSync(join(tmpdir(), 'diagnose-repair-')), relay = createRelay({ port: 0 }), url = `ws://127.0.0.1:${await relay.listen()}`;
   const child = spawn('/bin/sh', ['-c', 'cat | /usr/bin/script -q /dev/null "$@"', 'repair-test', process.execPath, 'dist/cli.js', 'start', url], { detached: true, env: { ...process.env, HOME: childHome }, stdio: ['pipe', 'pipe', 'pipe'] });
-  let output = '', startup = false, approvals = 0; child.stderr.resume(); child.stdout.on('data', bytes => { output += bytes.toString(); if (!startup && output.includes('Task approval for the next session?')) { startup = true; child.stdin.write('\n'); } const count = output.split('Allow this temporary diagnostic session?').length - 1; if (count > approvals) { approvals = count; child.stdin.write('a\n'); } });
+  let output = '', startup = false, approvals = 0; child.stderr.resume(); child.stdout.on('data', bytes => { output += bytes.toString(); if (!startup && output.includes('Task approval for the next session?')) { startup = true; child.stdin.write('r\n'); } const count = output.split('Allow this temporary diagnostic session?').length - 1; if (count > approvals) { approvals = count; child.stdin.write('a\n'); } });
   const codes = () => [...new Set(output.match(/\b[a-z]{3}-[a-z]{3}-[a-z]{3}\b/g) ?? [])];
   const until = async (predicate: () => boolean) => { for (let n = 0; n < 200 && !predicate(); n++) await new Promise(resolve => setTimeout(resolve, 20)); assert.ok(predicate(), output); };
   let peer: Peer | undefined;

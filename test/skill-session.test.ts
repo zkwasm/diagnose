@@ -121,12 +121,12 @@ test('native Skill pairs once, inspects performance, tracks repair retries, and 
     const expectedSha256 = createHash('sha256').update('offline\n').digest('hex');
     const repair = { requestId: randomUUID(), operation: 'file.write', arguments: { path: config, content: 'online\n', expectedSha256 }, reason: 'Repair the isolated demo configuration' };
     assert.deepEqual(await call('diagnose_start', repair), { id: repair.requestId });
-    assert.deepEqual(await call('diagnose_wait', { id: repair.requestId, timeoutMs: 0 }), { id: repair.requestId, pending: true, stage: 'awaiting-start', state: 'pending' });
+    assert.deepEqual(await call('diagnose_wait', { id: repair.requestId, timeoutMs: 100 }), { id: repair.requestId, pending: true, stage: 'awaiting-execution-approval', state: 'pending' });
     assert.deepEqual(await call('diagnose_start', repair), { id: repair.requestId });
     await assert.rejects(call('diagnose_start', { ...repair, reason: 'Different task' }), /belongs to a different task/);
     approveWrite();
     await transferReady;
-    assert.equal((await call('diagnose_wait', { id: repair.requestId, timeoutMs: 0 })).stage, 'started');
+    assert.equal((await call('diagnose_wait', { id: repair.requestId, timeoutMs: 100 })).stage, 'awaiting-transfer-approval');
     approveTransfer();
     const completed = await call('diagnose_wait', { id: repair.requestId, timeoutMs: 5000, release: true });
     assert.equal(completed.state, 'finished');

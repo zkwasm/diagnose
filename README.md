@@ -20,7 +20,7 @@ In v0.8+, press Enter to review tasks and results, choose `a` to approve tasks a
 
 ### Manual agent mode (recommended for a first session)
 
-Install once from this GitHub repository. The native Skill uses Diagnose 0.8.4 and starts the local runtime on demand through Node.js and npm.
+Install once from this GitHub repository. The native Skill uses Diagnose 0.8.5 and starts the local runtime on demand through Node.js and npm.
 
 | Agent | Install | Use |
 | --- | --- | --- |
@@ -42,6 +42,8 @@ The launcher loads Diagnose MCP for this session. Tell the agent what to check:
 Diagnose 0.8.1 reports pairing progress. Check the [first device check](docs/guide/diagnose.md#run-a-diagnostic-session) for how to distinguish a connected probe, an identified interface, and an actual response from the device.
 
 The user grants permission locally, either when the connection arrives or in advance with **Approve everything**. Automatic task approval includes both execution and result transmission. Possessing a pairing code does not establish the diagnostician's real identity.
+
+Both endpoints can resume a temporary session after a network drop on 0.8.5+. Keep the on-site probe open and use the same skill session handle or case. See the [reconnect guide](docs/guide/reconnect.md#resume-the-current-session) and [Windows desktop preview](docs/guide/on-site.md#windows-desktop-preview).
 
 ### Start automatically with a device procedure
 

@@ -23,6 +23,25 @@ jobs:
       - if: runner.os == 'Windows'
         run: npm run build
       - if: runner.os == 'Windows'
-        run: node --experimental-strip-types --test test/review.test.ts test/vector.test.ts test/skill.test.ts test/skill-library.test.ts test/knowledge.test.ts test/knowledge-mcp.test.ts test/short-pairing.test.ts test/skill-session.test.ts test/install-skill.test.ts
+        run: node --experimental-strip-types --test test/review.test.ts test/vector.test.ts test/skill.test.ts test/skill-library.test.ts test/knowledge.test.ts test/knowledge-mcp.test.ts test/short-pairing.test.ts test/skill-session.test.ts test/install-skill.test.ts test/desktop.test.ts
+      - if: runner.os == 'Windows'
+        name: Build and smoke-test the Windows installer
+        shell: powershell
+        run: |
+          ./desktop/windows/build.ps1 -Output "$env:RUNNER_TEMP/diagnose-installer"
+          $setup = "$env:RUNNER_TEMP/diagnose-installer/Diagnose-Probe-Windows-x64.exe"
+          $pathBefore = [Environment]::GetEnvironmentVariable('Path', 'User')
+          $installed = Join-Path $env:LOCALAPPDATA 'Programs/Diagnose Probe'
+          $process = Start-Process -FilePath $setup -ArgumentList '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART' -PassThru -Wait
+          if ($process.ExitCode -ne 0) { throw "Installer exited with $($process.ExitCode)" }
+          if (-not (Test-Path -LiteralPath (Join-Path $installed 'Diagnose Probe.exe'))) { throw 'Missing installed desktop app' }
+          if ($pathBefore -ne [Environment]::GetEnvironmentVariable('Path', 'User')) { throw 'Installer unexpectedly changed the user PATH' }
+          & (Join-Path $installed 'node.exe') (Join-Path $installed 'dist/cli.js') help
+          if ($LASTEXITCODE) { throw 'Installed bundled runtime did not start' }
+      - if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: diagnose-probe-windows-x64-test-build
+          path: ${{ runner.temp }}/diagnose-installer
       - if: runner.os == 'Linux'
         run: npm run build:site && npm run check:site

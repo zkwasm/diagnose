@@ -30,7 +30,7 @@ Then tell the agent what to inspect and provide the pairing code in the agent co
 
 The code and diagnostic results enter your chosen AI provider's context. The user confirms the connection if their [startup choice](on-site.md#start-the-probe) requires it. Ask the agent to use the `diagnose_*` tools for remote actions: its normal shell and file tools still act on the diagnostician's computer.
 
-To give the agent its task at launch, [pass a device procedure with `--skill`](procedures.md#start-with-a-device-skill-or-markdown-task).
+To give the agent its task at launch, [pass a device procedure with `--skill`](procedures.md#start-with-a-device-skill-or-markdown-task). Add `--lang en`, `--lang zh`, or `--lang es` to select the response language for a procedure or case. Otherwise, the local OS language is used when supported.
 
 ## Direct CLI and other MCP clients
 
@@ -146,6 +146,8 @@ SOCKS defaults to `allowedHosts:["*"]`, which permits any target. Narrow it when
 ### Serial devices
 
 `system.inspect` lists serial ports. `serial.capture` reads a selected port; `serial.exchange` first sends explicitly authorized `dataHex`. Both use 8N1 with DTR/RTS set false. Opening a port can still reset some hardware. Verify the selected device and avoid opening unrelated ports.
+
+In 0.8.5+, wait for `serial-ready` before asking the site user to restart equipment for log capture. For a device that loses its USB connection on power cycle, set `reattach: true` on `serial.capture`. The probe waits within the original capture window and only reopens a uniquely matching USB vendor ID, product ID and serial number. It can follow a changed COM port. If the device lacks a unique USB identity, arrange a new capture after the user reconnects it.
 
 ## Limits and timeouts
 

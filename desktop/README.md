@@ -2,6 +2,8 @@
 
 The desktop apps use the same on-site Probe runtime as the CLI. They bundle Node.js and native serial modules. Users choose a language, start support, share a one-time code and end access from the window.
 
+Download installers and SHA-256 checksums from the [0.8.5 desktop preview release](https://github.com/zkwasm/diagnose/releases/tag/v0.8.5-desktop.1).
+
 | Platform | Preview builds | Build command |
 | --- | --- | --- |
 | Windows x64 | [Tests workflow](https://github.com/zkwasm/diagnose/actions/workflows/test.yml) | [Windows build instructions](windows/README.md) |

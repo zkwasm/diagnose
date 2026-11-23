@@ -10,15 +10,15 @@ If Node.js, npm, and npx are already installed, go straight to [Start the probe]
 
 The Windows x64 preview bundles the runtime and serial support. It installs for your Windows account and opens from the Start menu as **Diagnose Probe**. Pick a language, select **Start support**, review the permission choices and copy the one-time code. Keep the app open while the diagnostician works. Select **Require review** to revoke automatic approval or **End access** to stop the session.
 
-The unsigned installer from [GitHub Actions](https://github.com/zkwasm/diagnose/actions/workflows/test.yml) is a test build. A public download still needs signing and a clean Windows test with a physical USB device.
+The unsigned Windows installer is available in the [desktop preview release](https://github.com/zkwasm/diagnose/releases/tag/v0.8.5-desktop.1). Production distribution still needs signing and a clean Windows test with a physical USB device.
 
 ## macOS and Linux desktop previews
 
-For macOS 13 or later, use the DMG that matches your processor, Apple Silicon or Intel. Open the image and drag **Diagnose Probe** into Applications. The CI previews are for development. Public downloads require Apple Developer ID signing and notarization.
+For macOS 13 or later, use the DMG that matches your processor, Apple Silicon or Intel. Open the image and drag **Diagnose Probe** into Applications. The preview is for testing. Production distribution requires Apple Developer ID signing and notarization.
 
 On Ubuntu 22.04 or later or Debian 12 or later, install the matching `.deb` and open **Diagnose Probe** from the applications menu. The package includes the Probe runtime. Linux uses the machine's normal access rules for USB serial ports.
 
-Both apps use **Start support**, **Copy code** and **End access**. Preview builds with checksums are attached to the [desktop packages workflow](https://github.com/zkwasm/diagnose/actions/workflows/desktop-packages.yml) after successful builds.
+Both apps use **Start support**, **Copy code** and **End access**. Download an installer and its checksum from the [desktop preview release](https://github.com/zkwasm/diagnose/releases/tag/v0.8.5-desktop.1).
 
 ## First-time setup: install Node.js and npm
 
